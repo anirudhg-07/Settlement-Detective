@@ -16,8 +16,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 3 | Synthetic data generator | ✅ done |
 | 4 | Exception injection | ✅ done |
 | 5 | Deterministic reconciliation engine | ✅ done |
-| 6 | Exception classification | next |
-| 7–16 | AI agent → evidence → confidence → UI → evaluation | pending |
+| 6 | Exception classification | ✅ done |
+| 7 | AI investigation agent | next |
+| 8–16 | Evidence → confidence → audit → UI → evaluation | pending |
 
 ## Quick start
 
@@ -32,20 +33,29 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python scripts/reconcile.py       # reconcile + score vs ground truth
 ```
 
-## Baseline (Phase 5, 10,055 payments)
+## Baseline (Phases 5–6, 10,055 payments)
 
 | | |
 |---|---|
 | Reconciled (matched + legitimately pending) | 94.35% |
 | Detection precision | **100.00%** — no healthy payment ever flagged |
-| Recall, exceptions that move money | **100.00%** (568/568) |
-| Recall, all injected exceptions | 81.14% (568/700) |
+| Detection recall | **100.00%** (700/700) |
+| Classification, where a single correct type exists | **100.00%** (633/633) |
+| Classification, over all injected exceptions | 90.43% |
 | Throughput | ~24,000 payments/s |
 
-The gap between the two recall figures is the honest one: 132 injected
-exceptions — duplicate charges, late-but-correct settlements, unauthorised
-adjustments — reconcile perfectly. Arithmetic cannot see them. That is what
-Phase 6's rules exist to close.
+**The baseline is deliberately strong.** It is what the AI must beat, and a
+weak one would make Phase 14's comparison worthless.
+
+Its remaining gap is one thing: **67 `MULTI_CAUSE` exceptions** where two faults
+share a single discrepancy. No individual cause matches the delta, so the
+baseline declines to answer rather than guess. That is correct behaviour — and
+it is exactly the gap an investigating agent exists to close.
+
+> **Caveat worth stating.** These rules were written knowing which faults the
+> injectors create. Real exception queues are not so obliging, and Phase 15's
+> stress tests must include variants the rules have never seen. The 90.43%
+> should be read as an upper bound on what rules achieve, not a typical one.
 
 ## Design commitments
 

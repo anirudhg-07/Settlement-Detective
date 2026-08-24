@@ -251,7 +251,7 @@ def _mint_run_id(as_of: date, started_at: datetime) -> str:
     return f"run_{started_at:%Y%m%d%H%M%S}_{as_of:%Y%m%d}"
 
 
-def _mint_exception_id(run_id: str, payment_id: str) -> str:
+def mint_exception_id(run_id: str, payment_id: str) -> str:
     """Deterministic, so re-running the same data yields the same ids."""
     digest = hashlib.sha1(f"{run_id}:{payment_id}".encode()).hexdigest()
     return f"EX-{digest[:10].upper()}"
@@ -326,7 +326,7 @@ def _run(conn: Connection, *, cfg: FinancialConfig, as_of: date) -> RunSummary:
 
     exceptions = [
         {
-            "exception_id": _mint_exception_id(run_id, o.payment_id),
+            "exception_id": mint_exception_id(run_id, o.payment_id),
             "run_id": run_id,
             "payment_id": o.payment_id,
             "exception_type": None,  # Phase 6 classifies

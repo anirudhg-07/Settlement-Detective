@@ -27,6 +27,7 @@ from sqlalchemy import text
 from backend.config import get_settings
 from backend.db.session import eval_engine, owner_engine
 from backend.money import format_paise
+from backend.reconciliation.classifier import FAMILY_TO_TYPE, classify_run
 from backend.reconciliation.engine import run_reconciliation
 
 
@@ -35,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Reconcile the loaded dataset")
     p.add_argument("--as-of", type=date.fromisoformat, default=settings.as_of_date)
     p.add_argument("--no-score", action="store_true", help="skip the ground-truth score")
+    p.add_argument("--no-classify", action="store_true", help="detect only, do not classify")
     return p.parse_args()
 
 
@@ -67,6 +69,10 @@ def score_against_truth(run_id: str) -> None:
     true_positives = detected & injected
     false_positives = detected - injected
     missed_visible = visible - detected
+    # Scoped to the delta-visible denominator: once the rules run, `detected`
+    # includes exceptions that never had a delta, and dividing those by the
+    # delta-visible count produces a recall above 100% - a nonsense figure.
+    visible_found = detected & visible
 
     def pct(num: int, den: int) -> str:
         return f"{num * 100 / den:.2f}%" if den else "n/a"
@@ -76,12 +82,12 @@ def score_against_truth(run_id: str) -> None:
     print(f"    {'move money (findable by arithmetic)':<32}{len(visible):>8,}")
     print(f"    {'no delta (need rules - Phase 6)':<32}{len(invisible):>8,}")
     print()
-    print(f"  {'detected by the engine':<34}{len(detected):>8,}")
+    print(f"  {'detected (arithmetic + rules)':<34}{len(detected):>8,}")
     print(f"  {'true positives':<34}{len(true_positives):>8,}")
     print(f"  {'false positives':<34}{len(false_positives):>8,}")
     print()
     print(f"  {'precision':<34}{pct(len(true_positives), len(detected)):>8}")
-    print(f"  {'recall (delta-visible only)':<34}{pct(len(true_positives), len(visible)):>8}")
+    print(f"  {'recall (delta-visible only)':<34}{pct(len(visible_found), len(visible)):>8}")
     print(f"  {'recall (all injected)':<34}{pct(len(true_positives), len(injected)):>8}")
     print()
 
@@ -104,6 +110,53 @@ def score_against_truth(run_id: str) -> None:
     for reason, (found, total) in sorted(by_reason.items(), key=lambda kv: -kv[1][1]):
         bar = "#" * (found * 20 // total) if total else ""
         print(f"    {reason:<26}{found:>4}/{total:<5}{pct(found, total):>8}  {bar}")
+    print()
+
+    # ---- classification accuracy ---------------------------------------
+    with eval_engine().connect() as conn:
+        assigned = {
+            r.payment_id: r.exception_type
+            for r in conn.execute(
+                text(
+                    "SELECT payment_id, exception_type FROM recon.exceptions"
+                    " WHERE run_id = :r"
+                ),
+                {"r": run_id},
+            )
+        }
+
+    correct = wrong = unscoreable = 0
+    per_cause: dict[str, list[int]] = {}
+    for pid, (reason, _) in truth.items():
+        if pid not in assigned:
+            continue
+        want = FAMILY_TO_TYPE.get(reason, reason)
+        got = assigned[pid]
+        stats = per_cause.setdefault(reason, [0, 0])
+        stats[1] += 1
+        if want is None:
+            # MULTI_CAUSE has no single correct type by construction.
+            unscoreable += 1
+        elif got == (want.value if hasattr(want, "value") else want):
+            correct += 1
+            stats[0] += 1
+        else:
+            wrong += 1
+
+    scoreable = correct + wrong
+    print("CLASSIFICATION")
+    print(f"  {'exceptions with a type assigned':<34}{len(assigned):>8,}")
+    print(f"  {'correct':<34}{correct:>8,}")
+    print(f"  {'incorrect':<34}{wrong:>8,}")
+    print(f"  {'no single correct type exists':<34}{unscoreable:>8,}")
+    print(f"  {'accuracy (where scoreable)':<34}{pct(correct, scoreable):>8}")
+    print(f"  {'accuracy (over all injected)':<34}{pct(correct, len(injected)):>8}")
+    print()
+    print("  classification by injected cause")
+    for reason, (right, total) in sorted(per_cause.items(), key=lambda kv: -kv[1][1]):
+        label = "n/a - no single type" if FAMILY_TO_TYPE.get(reason, reason) is None else pct(right, total)
+        bar = "#" * (right * 20 // total) if total else ""
+        print(f"    {reason:<26}{right:>4}/{total:<5}{label:>20}  {bar}")
     print()
 
 
@@ -131,6 +184,22 @@ def main() -> int:
     print(f"  {'write':<34}{summary.write_seconds:>7.2f}s")
     print(f"  {'throughput':<34}{summary.throughput:>7,.0f} payments/s")
     print()
+
+    if not args.no_classify:
+        with owner_engine().begin() as conn:
+            classification = classify_run(
+                conn, run_id=summary.run_id, cfg=cfg, as_of=args.as_of
+            )
+        print("CLASSIFIED (from the discrepancy)")
+        for kind, n in sorted(classification.classified.items(), key=lambda kv: -kv[1]):
+            print(f"  {kind:<34}{n:>8,}")
+        print(f"  {'-- of which several causes would':<34}")
+        print(f"  {'   together explain the delta':<34}{classification.combination_cases:>8,}")
+        print()
+        print("FOUND BY RULE (no discrepancy to detect)")
+        for kind, n in sorted(classification.rule_detected.items(), key=lambda kv: -kv[1]):
+            print(f"  {kind:<34}{n:>8,}")
+        print()
 
     if not args.no_score:
         score_against_truth(summary.run_id)

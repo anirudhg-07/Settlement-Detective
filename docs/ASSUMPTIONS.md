@@ -137,3 +137,27 @@ record behind it is unrepresentable: the foreign key from
 `settlement_items.refund_id` makes an orphan debit impossible. Referential
 integrity is the better guarantee to keep, so `MISSING_REFUND` models the
 mirror image — a refund that is recorded and due but was never debited.
+
+## Classification (Phase 6)
+
+Two stages answering different questions.
+
+**Typing a discrepancy.** Build every cause the records support, and see which
+one accounts for the delta *exactly*. One exact match is a classification.
+Zero matches, or two matches that each claim the whole delta, is not — those
+are reported `UNKNOWN_DISCREPANCY` rather than guessed at, because a wrong
+label is worse than no label: it sends a human down a dead end.
+
+**Finding what has no delta.** Three rules for exceptions that reconcile
+perfectly — duplicate charges (later capture flagged, first is legitimate),
+late-but-correct settlements, and adjustments with no reason recorded.
+
+**Stated limitation:** the classifier tests single hypotheses. When two faults
+share one discrepancy, no individual cause matches and it declines to answer.
+Searching combinations is where an investigating agent earns its place. That
+gap is pinned by `test_multi_cause_is_declined_rather_than_guessed` so it can
+be neither quietly widened nor quietly closed.
+
+**Ambiguity is refused, not resolved.** If two unlinked adjustments of the same
+size sit in one batch, attributing the discrepancy to either is a coin toss, so
+the hypothesis is not offered at all.
