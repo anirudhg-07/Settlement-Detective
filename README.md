@@ -15,8 +15,9 @@ Built for the Razorpay AI Buildathon, **AI Finance Controller** track.
 |---|---|---|
 | 1 | Financial model + specification | ✅ done |
 | 2 | Database schema + financial primitives | ✅ done |
-| 3 | Synthetic data generator | next |
-| 4–16 | Exceptions → reconciliation → AI agent → evidence → UI → evaluation | pending |
+| 3 | Synthetic data generator | ✅ done |
+| 4 | Exception injection | next |
+| 5–16 | Reconciliation engine → AI agent → evidence → UI → evaluation | pending |
 
 ## Quick start
 
@@ -26,7 +27,8 @@ docker compose up -d          # PostgreSQL 16 on :55432
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/alembic upgrade head
 ./.venv/bin/pytest -q         # the financial model's proof of consistency
-./.venv/bin/python scripts/verify_model.py   # worked examples, every rupee traced
+./.venv/bin/python scripts/verify_model.py    # worked examples, every rupee traced
+./.venv/bin/python scripts/generate_data.py --count 10000   # the FreshKart dataset
 ```
 
 ## Design commitments
@@ -58,12 +60,18 @@ backend/
     timing.py              settlement eligibility, business days
     settlement_math.py     expected settlement, sign convention, the decision
     guards.py              write-time rejection of impossible states
+  generation/
+    profile.py             FreshKart's distributions - basket sizes, method mix
+    generator.py           the world builder
+    verify.py              in-memory reconciliation: a clean world must be 100%
+    persist.py             dependency-ordered bulk load
   models/                  ops / recon / gt schemas
   db/session.py            one engine per database role
 alembic/versions/          0001 schemas · 0002 tables · 0003 roles + grants
 tests/                     G1-G6, the financial model's proof of consistency
 docs/ASSUMPTIONS.md        every assumption that changes a number
 scripts/verify_model.py    the worked examples, printed
+scripts/generate_data.py   generate, verify, then load the dataset
 ```
 
 ## Documentation

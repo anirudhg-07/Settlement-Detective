@@ -181,3 +181,116 @@ def test_same_inputs_two_runs_give_identical_results(cfg):
         cfg=cfg,
     )
     assert reconcile_payment(expected, **kwargs) == reconcile_payment(expected, **kwargs)
+
+
+# --------------------------------------------------------------------------
+# Component-level settlement cutoff (Phase 3 amendment)
+#
+# A refund settles on its own T+2 cycle. Between being processed and its batch
+# landing, the money is correctly still in flight - counting it as expected
+# would manufacture a discrepancy out of entirely healthy data.
+# --------------------------------------------------------------------------
+
+from backend.enums import RefundStatus  # noqa: E402
+from backend.reconciliation.settlement_math import RefundFact  # noqa: E402
+
+REFUNDED_ON = datetime(2026, 1, 20, 12, 0, tzinfo=timezone.utc)  # a Tuesday
+
+
+def _with_late_refund(cfg, as_of):
+    facts = PaymentFacts(
+        payment_id="pay_1001",
+        amount=100_000,
+        method=PaymentMethod.CARD,
+        status=PaymentStatus.PARTIALLY_REFUNDED,
+        captured_at=CAPTURED,
+        fee=2_000,
+        tax=360,
+        refunds=(
+            RefundFact("rfnd_1", 40_000, RefundStatus.PROCESSED, processed_at=REFUNDED_ON),
+        ),
+    )
+    return expected_net_settlement(facts, cfg, as_of=as_of)
+
+
+def test_refund_not_yet_due_is_excluded_from_the_expectation(cfg):
+    """Refunded Tue 20 Jan -> eligible Thu 22 -> deadline Fri 23."""
+    result = _with_late_refund(cfg, as_of=date(2026, 1, 21))
+    assert result.refunded == 0
+    assert result.refunds_not_yet_due == 40_000
+    assert result.expected_net == 97_640  # payment leg only
+
+
+def test_refund_counts_from_its_eligibility_date_not_its_deadline(cfg):
+    """The cutoff is eligibility (Thu 22), not the deadline (Fri 23).
+
+    Using the deadline here would exclude a refund that has already been
+    debited - a phantom discrepancy on entirely healthy data. This is the bug
+    the Phase 3 generator surfaced on 4 of 2,000 clean cases.
+    """
+    on_eligibility_date = _with_late_refund(cfg, as_of=date(2026, 1, 22))
+    assert on_eligibility_date.refunded == 40_000
+    assert on_eligibility_date.expected_net == 57_640
+
+
+def test_refund_enters_the_expectation_once_its_cycle_elapses(cfg):
+    result = _with_late_refund(cfg, as_of=date(2026, 1, 23))
+    assert result.refunded == 40_000
+    assert result.refunds_not_yet_due == 0
+    assert result.expected_net == 57_640
+
+
+def test_healthy_payment_with_an_in_flight_refund_does_not_become_an_exception(cfg):
+    """The false-positive this amendment exists to prevent."""
+    expected = _with_late_refund(cfg, as_of=date(2026, 1, 21))
+    outcome = reconcile_payment(
+        expected,
+        actual_net=97_640,  # only the payment line has settled so far
+        has_settled_items=True,
+        captured_at=CAPTURED,
+        as_of=date(2026, 1, 21),
+        cfg=cfg,
+    )
+    assert outcome.status is ReconStatus.MATCHED
+
+
+def test_a_genuinely_missing_refund_debit_is_still_caught(cfg):
+    """The cutoff must not become a blanket excuse once the deadline passes."""
+    expected = _with_late_refund(cfg, as_of=date(2026, 1, 26))
+    outcome = reconcile_payment(
+        expected,
+        actual_net=97_640,  # refund still never debited
+        has_settled_items=True,
+        captured_at=CAPTURED,
+        as_of=date(2026, 1, 26),
+        cfg=cfg,
+    )
+    assert outcome.status is ReconStatus.EXCEPTION
+    assert outcome.delta == 40_000
+
+
+def test_omitting_as_of_counts_every_component(cfg):
+    """Backwards compatibility: no cutoff means no gating."""
+    result = _with_late_refund(cfg, as_of=None)
+    assert result.refunded == 40_000
+    assert result.refunds_not_yet_due == 0
+
+
+def test_over_refund_is_flagged_even_when_not_yet_due(cfg):
+    """An impossible refund total is impossible regardless of when it lands."""
+    from backend.enums import DataCondition
+
+    facts = PaymentFacts(
+        payment_id="pay_1001",
+        amount=100_000,
+        method=PaymentMethod.CARD,
+        status=PaymentStatus.REFUNDED,
+        captured_at=CAPTURED,
+        fee=2_000,
+        tax=360,
+        refunds=(
+            RefundFact("r1", 150_000, RefundStatus.PROCESSED, processed_at=REFUNDED_ON),
+        ),
+    )
+    result = expected_net_settlement(facts, cfg, as_of=date(2026, 1, 21))
+    assert DataCondition.REFUND_EXCEEDS_PAYMENT in result.flags

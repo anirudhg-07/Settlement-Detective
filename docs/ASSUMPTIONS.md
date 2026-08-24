@@ -71,3 +71,39 @@ its minor units were paise.
 grant on the schema, so a leak surfaces as `permission denied` rather than
 depending on nobody writing a careless join. Asserted by
 `test_agent_role_cannot_read_ground_truth`.
+
+## Component-level settlement cutoff (added in Phase 3)
+
+A refund settles on **its own** T+2 cycle, which may be a later batch than the
+payment it belongs to. Between a refund being processed and its batch landing,
+the money is correctly still in flight.
+
+> A refund or adjustment enters the expectation only once **its own eligibility
+> date** has passed.
+
+The cutoff is the *eligibility* date, not the deadline. The grace period answers
+a different question — "is this late enough to call missing?" — and using it
+here excluded refunds that had demonstrably already been debited, producing
+phantom discrepancies on 4 of 2,000 clean cases. Pinned by
+`test_refund_counts_from_its_eligibility_date_not_its_deadline`.
+
+The payment leg is not gated this way; its pending state is decided by
+`reconcile_payment` using the deadline, which is what grace is for.
+
+## FreshKart merchant profile
+
+Rates are in basis points so no probability is a float. Defined in
+`backend/generation/profile.py`.
+
+| Parameter | Value |
+|---|---|
+| Basket sizes | ₹100–₹49,999, weighted dense in the low hundreds |
+| Method mix | UPI 55%, card 22%, wallet 15%, netbanking 8% |
+| Payment failure rate | 4% |
+| Refund rate | 9% of captured (40% full, 60% partial) |
+| Adjustment rate | 1.2% of captured |
+| History | 90 days ending at `AS_OF_DATE` |
+| Repeat business | ~4 payments per customer |
+
+Payments captured inside the settlement window have no batch yet and reconcile
+as `PENDING_SETTLEMENT` — legitimately in flight, never counted as exceptions.

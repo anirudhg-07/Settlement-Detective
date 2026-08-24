@@ -291,3 +291,58 @@ def test_eval_role_can_read_ground_truth():
         pytest.skip("no eval URL configured")
     with eval_engine().connect() as conn:
         assert conn.execute(sa.text("SELECT count(*) FROM gt.case_truth")).scalar() >= 0
+
+
+# --- the refund-total trigger (migration 0004) ----------------------------
+@pytest.mark.db
+def test_refund_total_trigger_rejects_over_refunding(seeded):
+    """A cross-row invariant enforced by the database, not just by app code."""
+    seeded.execute(
+        sa.text(
+            "INSERT INTO ops.refunds VALUES "
+            "(:rid, :pid, :oid, 80000, 'processed', :now, :now)"
+        ),
+        {"rid": "rfnd_ok", "pid": "pay_t1", "oid": "ord_t1", "now": NOW},
+    )
+    with pytest.raises(Exception, match="ck_refunds_total_within_payment"):
+        seeded.execute(
+            sa.text(
+                "INSERT INTO ops.refunds VALUES "
+                "(:rid, :pid, :oid, 30000, 'processed', :now, :now)"
+            ),
+            {"rid": "rfnd_over", "pid": "pay_t1", "oid": "ord_t1", "now": NOW},
+        )
+
+
+@pytest.mark.db
+def test_refund_total_trigger_allows_refunds_up_to_the_payment(seeded):
+    for rid, amount in (("rfnd_a", 60_000), ("rfnd_b", 40_000)):
+        seeded.execute(
+            sa.text(
+                "INSERT INTO ops.refunds VALUES "
+                "(:rid, :pid, :oid, :amt, 'processed', :now, :now)"
+            ),
+            {"rid": rid, "pid": "pay_t1", "oid": "ord_t1", "amt": amount, "now": NOW},
+        )
+    total = seeded.execute(
+        sa.text("SELECT sum(amount) FROM ops.refunds WHERE payment_id = 'pay_t1'")
+    ).scalar()
+    assert total == 100_000
+
+
+@pytest.mark.db
+def test_failed_refunds_do_not_count_toward_the_trigger_limit(seeded):
+    for rid, amount, status in (
+        ("rfnd_f", 100_000, "failed"),
+        ("rfnd_g", 100_000, "processed"),
+    ):
+        seeded.execute(
+            sa.text(
+                "INSERT INTO ops.refunds VALUES "
+                "(:rid, :pid, :oid, :amt, :st, :now, :now)"
+            ),
+            {
+                "rid": rid, "pid": "pay_t1", "oid": "ord_t1",
+                "amt": amount, "st": status, "now": NOW,
+            },
+        )

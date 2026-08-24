@@ -33,7 +33,7 @@ from backend.enums import (
 )
 from backend.money import round_half_up
 from backend.reconciliation.fees import compute_fee_and_tax
-from backend.reconciliation.timing import settlement_deadline
+from backend.reconciliation.timing import settlement_deadline, settlement_eligible_on
 
 # --------------------------------------------------------------------------
 # Inputs
@@ -45,6 +45,9 @@ class RefundFact:
     refund_id: str
     amount: int
     status: RefundStatus
+    #: When the refund was processed. A refund settles on its own T+2 cycle
+    #: from this date, which may fall in a later batch than the payment's.
+    processed_at: date | datetime | None = None
 
     @property
     def is_settled_debit(self) -> bool:
@@ -57,6 +60,7 @@ class AdjustmentFact:
     adjustment_id: str
     amount: int  # signed: credit positive, debit negative
     type: str
+    created_at: date | datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +103,11 @@ class ExpectedSettlement:
     adjusted: int
     expected_net: int
     flags: tuple[DataCondition, ...] = ()
+    #: Components excluded because their own settlement cycle has not yet
+    #: elapsed. Not discrepancies - money correctly still in flight. Surfaced
+    #: so the UI can say "Rs400 refund not yet debited" instead of going quiet.
+    refunds_not_yet_due: int = 0
+    adjustments_not_yet_due: int = 0
 
     @property
     def fee_retained(self) -> int:
@@ -138,10 +147,38 @@ class ReconOutcome:
 # --------------------------------------------------------------------------
 
 
+def component_is_due(
+    event_at: date | datetime | None, as_of: date | None, cfg: FinancialConfig
+) -> bool:
+    """Has this component's own settlement cycle elapsed by ``as_of``?
+
+    Refunds and adjustments settle on their own T+2 cycle. Between a refund
+    being processed and its batch landing, the money is correctly still in
+    flight - counting it as expected would manufacture a discrepancy out of
+    healthy data.
+
+    The cutoff is the **eligibility** date, not the deadline. The grace period
+    answers a different question - "is this late enough to call missing?" - and
+    using it here would exclude a refund that has demonstrably already been
+    debited, producing a phantom discrepancy on healthy data.
+
+    ``as_of=None`` disables the cutoff and counts everything.
+    """
+    if as_of is None or event_at is None:
+        return True
+    return settlement_eligible_on(event_at, cfg) <= as_of
+
+
 def expected_net_settlement(
-    facts: PaymentFacts, cfg: FinancialConfig
+    facts: PaymentFacts, cfg: FinancialConfig, as_of: date | None = None
 ) -> ExpectedSettlement:
-    """Compute what this payment *should* net into the merchant's bank."""
+    """Compute what this payment *should* net into the merchant's bank.
+
+    When ``as_of`` is given, refunds and adjustments whose own settlement cycle
+    has not yet elapsed are excluded from the expectation and reported
+    separately. The payment leg is not gated here - its pending state is
+    decided by :func:`reconcile_payment`.
+    """
     flags: list[DataCondition] = []
 
     settleable = PaymentStatus(facts.status) in SETTLEABLE_PAYMENT_STATUSES
@@ -159,14 +196,36 @@ def expected_net_settlement(
     fee_charged = (facts.fee or 0) if settleable else 0
     tax_charged = (facts.tax or 0) if settleable else 0
 
-    # Only processed refunds have actually moved money.
-    refunded = sum(r.amount for r in facts.refunds if r.is_settled_debit)
-    if gross and refunded > gross:
+    # Only processed refunds have actually moved money, and only those whose
+    # own settlement cycle has elapsed are expected to have been debited yet.
+    settled_refunds = [r for r in facts.refunds if r.is_settled_debit]
+    refunded = sum(
+        r.amount
+        for r in settled_refunds
+        if component_is_due(r.processed_at, as_of, cfg)
+    )
+    refunds_not_yet_due = sum(
+        r.amount
+        for r in settled_refunds
+        if not component_is_due(r.processed_at, as_of, cfg)
+    )
+    # The over-refund check uses every processed refund, due or not: an
+    # impossible refund total is impossible regardless of when it lands.
+    if gross and sum(r.amount for r in settled_refunds) > gross:
         flags.append(DataCondition.REFUND_EXCEEDS_PAYMENT)
 
     fee_reversed, tax_reversed = _reversal(gross, refunded, fee_charged, tax_charged, cfg)
 
-    adjusted = sum(a.amount for a in facts.adjustments)
+    adjusted = sum(
+        a.amount
+        for a in facts.adjustments
+        if component_is_due(a.created_at, as_of, cfg)
+    )
+    adjustments_not_yet_due = sum(
+        a.amount
+        for a in facts.adjustments
+        if not component_is_due(a.created_at, as_of, cfg)
+    )
 
     expected_net = (
         gross
@@ -187,6 +246,8 @@ def expected_net_settlement(
         adjusted=adjusted,
         expected_net=expected_net,
         flags=tuple(flags),
+        refunds_not_yet_due=refunds_not_yet_due,
+        adjustments_not_yet_due=adjustments_not_yet_due,
     )
 
 
