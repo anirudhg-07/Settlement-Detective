@@ -5,8 +5,6 @@
 Traditional reconciliation tells you **what** doesn't match. Settlement Detective
 investigates **why** — and escalates what it cannot safely explain.
 
-Built for the Razorpay AI Buildathon, **AI Finance Controller** track.
-
 ---
 
 ## Status
