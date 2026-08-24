@@ -107,3 +107,33 @@ Rates are in basis points so no probability is a float. Defined in
 
 Payments captured inside the settlement window have no batch yet and reconcile
 as `PENDING_SETTLEMENT` — legitimately in flight, never counted as exceptions.
+
+## Exception injection (Phase 4)
+
+7% of payments are broken deliberately. Ground truth in `gt.case_truth` records
+the cause, the amount it accounts for, and the parameters used.
+
+**Not every exception has a delta.** `DUPLICATE_PAYMENT`, `SETTLEMENT_TIMING`
+and `UNEXPECTED_ADJUSTMENT` reconcile perfectly at the payment level — the money
+adds up, but it should never have moved, or moved late. Those are found by rule
+in Phase 6. Each injector declares which kind it is via `delta_visible`, and the
+loader checks that the delta-visible set matches the detected set exactly.
+
+**The three hard families** exist to separate rule-based matching from genuine
+multi-record reasoning:
+
+| Family | Why a rule fails |
+|---|---|
+| `MULTI_CAUSE` | Two faults in one delta; single-hypothesis matching finds no exact match and gives up |
+| `CROSS_ENTITY` | The explanation is an adjustment with `payment_id = NULL`, named only in free text and reachable only via the settlement batch |
+| `TIMING_SHIFTED` | Looks identical to a missing refund until you check that the debit exists in an unprocessed batch |
+
+**`UNKNOWN_DISCREPANCY` carries no explanation on purpose.** `explained_amount`
+is `NULL`. If ground truth held an answer, an honest "I don't know" would score
+as a failure — which would teach the whole system to guess.
+
+**One variant is deliberately not modelled.** A settlement debit with no refund
+record behind it is unrepresentable: the foreign key from
+`settlement_items.refund_id` makes an orphan debit impossible. Referential
+integrity is the better guarantee to keep, so `MISSING_REFUND` models the
+mirror image — a refund that is recorded and due but was never debited.

@@ -227,14 +227,11 @@ class SettlementItem(Base):
         sa.CheckConstraint(
             "item_type <> 'REFUND' OR net_amount <= 0", name="refund_line_is_a_debit"
         ),
-        # A payment may be settled once. A second PAYMENT line for the same
-        # payment is a double-count, and is rejected rather than reconciled.
-        sa.Index(
-            "uq_settlement_items_payment_once",
-            "payment_id",
-            unique=True,
-            postgresql_where=sa.text("item_type = 'PAYMENT'"),
-        ),
+        # A payment may settle across more than one batch (partial settlement),
+        # but its lines may never credit more than the payment itself. That is
+        # enforced by trigger `trg_payment_not_over_settled` (migration 0005),
+        # because it is a cross-row invariant an index cannot express.
+        sa.Index("ix_settlement_items_payment_id", "payment_id"),
         sa.Index("ix_settlement_items_settlement_id", "settlement_id"),
         sa.Index("ix_settlement_items_refund_id", "refund_id"),
         {"schema": SCHEMA_OPS},

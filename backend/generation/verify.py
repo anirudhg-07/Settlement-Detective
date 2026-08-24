@@ -13,7 +13,13 @@ from collections import defaultdict
 from datetime import date
 
 from backend.config import FinancialConfig
-from backend.enums import PaymentMethod, PaymentStatus, ReconStatus, RefundStatus
+from backend.enums import (
+    PaymentMethod,
+    PaymentStatus,
+    ReconStatus,
+    RefundStatus,
+    SettlementStatus,
+)
 from backend.generation.generator import World
 from backend.reconciliation.settlement_math import (
     AdjustmentFact,
@@ -41,11 +47,21 @@ def reconcile_world(world: World, cfg: FinancialConfig, as_of: date) -> dict:
         a["adjustment_id"]: a["payment_id"] for a in world.adjustments
     }
 
-    # ACTUAL: every settled line that resolves to a payment, directly or via
-    # the refund or adjustment it belongs to.
+    # ACTUAL: every line that resolves to a payment, directly or via the refund
+    # or adjustment it belongs to - but only from batches that have actually
+    # been paid out. A line sitting in a `created` batch is money scheduled,
+    # not money received, and counting it would make a partial settlement look
+    # complete.
+    processed_batches = {
+        s["settlement_id"]
+        for s in world.settlements
+        if s["status"] == SettlementStatus.PROCESSED.value
+    }
     actual: dict[str, int] = defaultdict(int)
     has_payment_line: set[str] = set()
     for item in world.settlement_items:
+        if item["settlement_id"] not in processed_batches:
+            continue
         if item["payment_id"]:
             pid = item["payment_id"]
             has_payment_line.add(pid)

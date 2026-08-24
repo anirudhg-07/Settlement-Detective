@@ -168,11 +168,30 @@ def _insert_item(conn, item_id, **over):
 
 # --- 28. a payment may be settled only once -------------------------------
 @pytest.mark.db
-def test_duplicate_payment_settlement_line_is_rejected(seeded):
-    """A second PAYMENT line for the same payment would double-count the money."""
+def test_payment_cannot_be_over_settled(seeded):
+    """Two full-value PAYMENT lines would double-count the money.
+
+    Migration 0005 moved this from a unique index to a trigger so that genuine
+    partial settlement stays representable - but over-settling must still be
+    impossible.
+    """
     _insert_item(seeded, "si_t1")
-    with pytest.raises(IntegrityError, match="uq_settlement_items_payment_once"):
+    with pytest.raises(Exception, match="ck_payment_not_over_settled"):
         _insert_item(seeded, "si_t2")
+
+
+@pytest.mark.db
+def test_a_payment_may_legitimately_settle_across_two_batches(seeded):
+    """Partial settlement: the credits split, and together they never exceed."""
+    _insert_item(seeded, "si_p1", credit=60_000, fee=2_000, tax=360, net=57_640)
+    _insert_item(seeded, "si_p2", credit=40_000, fee=0, tax=0, net=40_000)
+    total = seeded.execute(
+        sa.text(
+            "SELECT sum(credit_amount) FROM ops.settlement_items "
+            "WHERE payment_id = 'pay_t1' AND item_type = 'PAYMENT'"
+        )
+    ).scalar()
+    assert total == 100_000
 
 
 @pytest.mark.db

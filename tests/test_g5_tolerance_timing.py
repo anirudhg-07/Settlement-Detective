@@ -294,3 +294,40 @@ def test_over_refund_is_flagged_even_when_not_yet_due(cfg):
     )
     result = expected_net_settlement(facts, cfg, as_of=date(2026, 1, 21))
     assert DataCondition.REFUND_EXCEEDS_PAYMENT in result.flags
+
+
+def test_a_vanished_credit_is_caught_even_when_nothing_was_owed(cfg):
+    """A zero-expectation payment whose debits survived its credit.
+
+    A fully refunded UPI payment owes exactly Rs0 - no fee, no tax, refund
+    equal to the capture. If its settlement credit disappears but the refund
+    debit remains, the merchant is out the full amount while the expectation
+    still reads zero. Matching on the expectation alone passed this silently;
+    matching on the delta catches it. Surfaced by Phase 4 injection on 1 of
+    10,000 cases.
+    """
+    facts = PaymentFacts(
+        payment_id="pay_upi",
+        amount=290_042,
+        method=PaymentMethod.UPI,
+        status=PaymentStatus.REFUNDED,
+        captured_at=CAPTURED,
+        fee=0,
+        tax=0,
+        refunds=(
+            RefundFact("rfnd_1", 290_042, RefundStatus.PROCESSED, processed_at=CAPTURED),
+        ),
+    )
+    expected = expected_net_settlement(facts, cfg, as_of=date(2026, 1, 31))
+    assert expected.expected_net == 0
+
+    outcome = reconcile_payment(
+        expected,
+        actual_net=-290_042,  # the refund debit, with no credit behind it
+        has_settled_items=False,
+        captured_at=CAPTURED,
+        as_of=date(2026, 1, 31),
+        cfg=cfg,
+    )
+    assert outcome.status is ReconStatus.EXCEPTION
+    assert outcome.delta == -290_042

@@ -14,8 +14,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 1 | Financial model + specification | ✅ done |
 | 2 | Database schema + financial primitives | ✅ done |
 | 3 | Synthetic data generator | ✅ done |
-| 4 | Exception injection | next |
-| 5–16 | Reconciliation engine → AI agent → evidence → UI → evaluation | pending |
+| 4 | Exception injection | ✅ done |
+| 5 | Deterministic reconciliation engine | next |
+| 6–16 | Classification → AI agent → evidence → UI → evaluation | pending |
 
 ## Quick start
 
@@ -61,6 +62,7 @@ backend/
   generation/
     profile.py             FreshKart's distributions - basket sizes, method mix
     generator.py           the world builder
+    exceptions.py          13 injectors + ground truth
     verify.py              in-memory reconciliation: a clean world must be 100%
     persist.py             dependency-ordered bulk load
   models/                  ops / recon / gt schemas

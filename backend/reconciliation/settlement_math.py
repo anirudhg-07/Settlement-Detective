@@ -335,19 +335,27 @@ def reconcile_payment(
     delta = actual_net - expected.expected_net
     tolerance = cfg.tolerance_paise
 
-    if not has_settled_items:
-        # Nothing was owed in the first place (e.g. a failed payment).
-        if abs(expected.expected_net) <= tolerance:
-            status = ReconStatus.MATCHED
-        elif captured_at is not None and as_of <= settlement_deadline(captured_at, cfg):
-            # Still inside the settlement window - not late, not an exception.
-            status = ReconStatus.PENDING_SETTLEMENT
-        else:
-            status = ReconStatus.EXCEPTION
+    if abs(delta) <= tolerance:
+        # The expectation was met. This is the only test for a match, and it
+        # deliberately does not care whether a payment line exists: a payment
+        # that owed nothing and received nothing reconciles just as cleanly as
+        # one that owed and received.
+        #
+        # An earlier version treated "nothing was owed" as sufficient on its
+        # own. That silently passed a fully-refunded zero-fee payment whose
+        # credit line had vanished while its refund debit remained - the
+        # expectation was Rs0, so it matched, while Rs2,900 had left the
+        # account with nothing behind it. Comparing the delta closes that hole.
+        status = ReconStatus.MATCHED
+    elif (
+        not has_settled_items
+        and captured_at is not None
+        and as_of <= settlement_deadline(captured_at, cfg)
+    ):
+        # Money legitimately still in flight - not late, not an exception.
+        status = ReconStatus.PENDING_SETTLEMENT
     else:
-        status = (
-            ReconStatus.MATCHED if abs(delta) <= tolerance else ReconStatus.EXCEPTION
-        )
+        status = ReconStatus.EXCEPTION
 
     return ReconOutcome(
         payment_id=expected.payment_id,
