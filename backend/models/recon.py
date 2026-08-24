@@ -51,6 +51,13 @@ class ReconRun(Base):
     records_processed: Mapped[int] = mapped_column(
         sa.Integer, nullable=False, default=0
     )
+    #: Denormalised run totals - the Command Centre reads these directly
+    #: rather than aggregating every result row on each page load.
+    matched_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
+    pending_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
+    exception_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
+    batches_checked: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
+    batches_out_of_balance: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0, server_default="0")
 
 
 class ReconResult(Base):
@@ -102,8 +109,11 @@ class Exception_(Base):
     payment_id: Mapped[str] = id_col(
         sa.ForeignKey(f"{SCHEMA_OPS}.payments.payment_id"), nullable=False
     )
-    exception_type: Mapped[str] = mapped_column(
-        enum_col(ExceptionType, "exception_type"), nullable=False
+    #: NULL until Phase 6 classifies it. A detected-but-unclassified exception
+    #: genuinely has no type, and a placeholder from the taxonomy would put a
+    #: false label into the audit trail.
+    exception_type: Mapped[str | None] = mapped_column(
+        enum_col(ExceptionType, "exception_type"), nullable=True
     )
     expected_net: Mapped[int] = money_col(nullable=False)
     actual_net: Mapped[int] = money_col(nullable=False)

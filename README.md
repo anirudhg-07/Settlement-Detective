@@ -15,8 +15,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 2 | Database schema + financial primitives | ✅ done |
 | 3 | Synthetic data generator | ✅ done |
 | 4 | Exception injection | ✅ done |
-| 5 | Deterministic reconciliation engine | next |
-| 6–16 | Classification → AI agent → evidence → UI → evaluation | pending |
+| 5 | Deterministic reconciliation engine | ✅ done |
+| 6 | Exception classification | next |
+| 7–16 | AI agent → evidence → confidence → UI → evaluation | pending |
 
 ## Quick start
 
@@ -28,7 +29,23 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/pytest -q         # the financial model's proof of consistency
 ./.venv/bin/python scripts/verify_model.py    # worked examples, every rupee traced
 ./.venv/bin/python scripts/generate_data.py --count 10000   # the FreshKart dataset
+./.venv/bin/python scripts/reconcile.py       # reconcile + score vs ground truth
 ```
+
+## Baseline (Phase 5, 10,055 payments)
+
+| | |
+|---|---|
+| Reconciled (matched + legitimately pending) | 94.35% |
+| Detection precision | **100.00%** — no healthy payment ever flagged |
+| Recall, exceptions that move money | **100.00%** (568/568) |
+| Recall, all injected exceptions | 81.14% (568/700) |
+| Throughput | ~24,000 payments/s |
+
+The gap between the two recall figures is the honest one: 132 injected
+exceptions — duplicate charges, late-but-correct settlements, unauthorised
+adjustments — reconcile perfectly. Arithmetic cannot see them. That is what
+Phase 6's rules exist to close.
 
 ## Design commitments
 
@@ -58,6 +75,7 @@ backend/
     fees.py                fee and GST
     timing.py              settlement eligibility, business days
     settlement_math.py     expected settlement, sign convention, the decision
+    engine.py              the database sweep; owns no arithmetic
     guards.py              write-time rejection of impossible states
   generation/
     profile.py             FreshKart's distributions - basket sizes, method mix
@@ -72,6 +90,7 @@ tests/                     G1-G6, the financial model's proof of consistency
 docs/ASSUMPTIONS.md        every assumption that changes a number
 scripts/verify_model.py    the worked examples, printed
 scripts/generate_data.py   generate, verify, then load the dataset
+scripts/reconcile.py       run the engine, score it against ground truth
 ```
 
 ## Documentation
