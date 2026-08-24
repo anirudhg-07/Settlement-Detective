@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sd_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-settlement_detective}
+      POSTGRES_USER: ${POSTGRES_USER:-sd_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_owner}
+    ports:
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - sd_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sd_owner} -d ${POSTGRES_DB:-settlement_detective}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  sd_pgdata:
