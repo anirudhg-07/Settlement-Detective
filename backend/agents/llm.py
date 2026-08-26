@@ -126,6 +126,22 @@ GEMINI_ENDPOINT = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
 
+#: A per-minute refusal clears in under a minute, so retrying is cheap and
+#: almost always works. Three attempts covers any realistic burst.
+MAX_RATE_LIMIT_RETRIES = 3
+BACKOFF_SECONDS = 20.0
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    """Honour the provider's own backoff hint when it sends one."""
+    raw = response.headers.get("retry-after")
+    if not raw:
+        return None
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return None
+
 
 def build_http_client() -> httpx.Client:
     """An HTTP client that survives a broken IPv6 path.
@@ -165,6 +181,7 @@ class GeminiProvider:
         self.limiter = RateLimiter(settings.llm_rpm)
         self.client = build_http_client()
         self.requests_made = 0
+        self.rate_limited = 0
         self.throttled_seconds = 0.0
 
     def send(
@@ -183,27 +200,58 @@ class GeminiProvider:
         if cached is not None:
             return self._parse(cached, from_cache=True)
 
-        self.throttled_seconds += self.limiter.wait()
-        try:
-            response = self.client.post(
-                GEMINI_ENDPOINT.format(model=self.model),
-                headers={"x-goog-api-key": self.api_key},
-                json=payload,
-            )
-        except httpx.HTTPError as exc:
-            raise LLMError(f"network failure calling {self.model}: {exc}") from exc
-
-        self.requests_made += 1
-        if response.status_code != 200:
-            raise LLMError(
-                f"HTTP {response.status_code} from {self.model}: {response.text[:300]}"
-            )
+        response = self._post_with_backoff(payload)
 
         data = response.json()
         if "error" in data:
             raise LLMError(f"{data['error'].get('status')}: {data['error'].get('message')}")
         self.cache.put(key, data)
         return self._parse(data, from_cache=False)
+
+    def _post_with_backoff(self, payload: dict) -> httpx.Response:
+        """Send one request, surviving a rate-limit refusal.
+
+        Hitting the per-minute ceiling is a pacing problem, not a failure - the
+        request is perfectly good and will succeed a moment later. Aborting the
+        batch over one would waste every case still queued behind it, so the
+        client waits out the provider's own `Retry-After` and tries again.
+
+        The daily ceiling is different: it does not clear for hours, so those
+        are surfaced as an error for the runner to stop on rather than slept
+        through.
+        """
+        last: str = ""
+        for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
+            self.throttled_seconds += self.limiter.wait()
+            try:
+                response = self.client.post(
+                    GEMINI_ENDPOINT.format(model=self.model),
+                    headers={"x-goog-api-key": self.api_key},
+                    json=payload,
+                )
+            except httpx.HTTPError as exc:
+                raise LLMError(f"network failure calling {self.model}: {exc}") from exc
+
+            self.requests_made += 1
+            if response.status_code == 200:
+                return response
+
+            last = f"HTTP {response.status_code}: {response.text[:300]}"
+            if response.status_code != 429:
+                raise LLMError(f"{last} (model {self.model})")
+
+            self.rate_limited += 1
+            if "per day" in response.text.lower() or "quota" in response.text.lower():
+                raise LLMError(
+                    f"daily quota appears exhausted - stop and resume tomorrow. {last}"
+                )
+            if attempt == MAX_RATE_LIMIT_RETRIES:
+                break
+            delay = _retry_after(response) or BACKOFF_SECONDS * (2 ** attempt)
+            self.throttled_seconds += delay
+            time.sleep(delay)
+
+        raise LLMError(f"rate limited after {MAX_RATE_LIMIT_RETRIES} retries. {last}")
 
     @staticmethod
     def _parse(data: dict, *, from_cache: bool) -> LLMResponse:

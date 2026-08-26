@@ -141,8 +141,11 @@ class Settings(BaseSettings):
     #: and the context window - an agent that cannot decide in this many hops
     #: should escalate, not keep digging.
     llm_max_tool_calls: int = 8
-    #: Free-tier request ceiling per minute. The client self-throttles to it.
-    llm_rpm: int = 15
+    #: Requests per minute the client paces itself to. Deliberately BELOW the
+    #: provider ceiling (15/min on the Gemini free tier): pacing to exactly the
+    #: limit leaves no headroom, and any jitter in round-trip time turns into a
+    #: 429. Costs ~13 extra minutes on a 400-request run; worth it.
+    llm_rpm: int = 10
     #: Cache every raw LLM response to disk. Re-scoring, re-analysis and UI
     #: work then replay for free instead of spending quota again.
     llm_cache_enabled: bool = True
