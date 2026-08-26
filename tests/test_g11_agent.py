@@ -146,7 +146,7 @@ def test_a_payment_cannot_be_evidence_for_its_own_discrepancy(conn, cfg_mod, a_c
     ])])
     assert result.evidence == []
     assert result.rejected_evidence
-    assert "cannot be the evidence for its own" in result.rejected_evidence[0]["reason"]
+    assert "cannot be the evidence for its own" in result.rejected_evidence[0].reason
     assert result.unexplained_amount == a_case["delta"]
     assert result.final_status == ExceptionStatus.ESCALATED.value
 
@@ -167,7 +167,7 @@ def test_missing_settlement_may_cite_the_payment_when_code_confirms_the_absence(
         evidence=[{"record_type": "payment", "record_id": row["payment_id"],
                    "amount_paise": row["delta"], "note": "never settled"}],
     )])
-    assert result.evidence and result.evidence[0].get("verified_absence")
+    assert result.evidence and result.evidence[0].snapshot == {"settled_credit_lines": 0}
     assert result.final_status == ExceptionStatus.RESOLVED.value
 
 
@@ -191,7 +191,7 @@ def test_invented_records_are_discarded(conn, cfg_mod, a_case):
          "amount_paise": a_case["delta"], "note": "invented"},
     ])])
     assert result.evidence == []
-    assert "no such record" in result.rejected_evidence[0]["reason"]
+    assert "no such record" in result.rejected_evidence[0].reason
     assert result.unexplained_amount == a_case["delta"]
     assert result.final_status == ExceptionStatus.ESCALATED.value
 
@@ -205,6 +205,7 @@ def test_declaring_unresolved_keeps_the_whole_discrepancy_unexplained(conn, cfg_
         evidence=[{"record_type": "fee", "record_id": a_case["fee_id"],
                    "amount_paise": a_case["delta"], "note": "attached anyway"}],
     )])
+    # Even a citation that WOULD verify does not close an escalation.
     assert result.unexplained_amount == a_case["delta"]
     assert result.final_status == ExceptionStatus.ESCALATED.value
 
@@ -225,14 +226,29 @@ def test_resolved_as_unknown_is_a_contradiction(conn, cfg_mod, a_case):
 def test_a_partial_explanation_goes_to_review_with_the_residual_stated(
     conn, cfg_mod, a_case
 ):
-    """The system never rounds a leftover away to claim a resolution."""
-    half = a_case["delta"] // 2
+    """The system never rounds a leftover away to claim a resolution.
+
+    The cited amount has to be one the record can genuinely support, or it is
+    rejected outright (see G12) - so this uses a real supported figure that
+    happens to cover only part of the discrepancy.
+    """
+    from backend.agents.evidence import supported_contributions
+
+    supported, _ = supported_contributions(
+        conn, "fee", a_case["fee_id"], a_case["payment_id"]
+    )
+    partial = next(
+        (s for s in supported if abs(s - a_case["delta"]) > cfg_mod.tolerance_paise), None
+    )
+    if partial is None:
+        pytest.skip("this fee record supports only the full delta")
+
     result = run(conn, cfg_mod, a_case, [finding(evidence=[
         {"record_type": "fee", "record_id": a_case["fee_id"],
-         "amount_paise": half, "note": "part of it"},
+         "amount_paise": partial, "note": "part of it"},
     ])])
     assert result.final_status == ExceptionStatus.REVIEW.value
-    assert result.unexplained_amount == a_case["delta"] - half
+    assert result.unexplained_amount == a_case["delta"] - partial
 
 
 @pytest.mark.db

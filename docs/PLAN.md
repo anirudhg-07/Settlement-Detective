@@ -17,9 +17,9 @@ Working checklist for the build. Six of sixteen phases done.
 | 4 | Exception injection | ✅ done | 130 |
 | 5 | Deterministic reconciliation engine | ✅ done | 146 |
 | 6 | Exception classification | ✅ done | 162 |
-| 7 | AI investigation agent | ✅ done | **186** |
-| 8 | Evidence builder | ⬅️ **next** | |
-| 9 | Confidence / safety layer | pending | |
+| 7 | AI investigation agent | ✅ done | 186 |
+| 8 | Evidence builder | ✅ done | **200** |
+| 9 | Confidence / safety layer | ⬅️ **next** | |
 | 10 | Audit trail | pending | |
 | 11 | Razorpay Test Mode integration | pending | |
 | 12 | Backend APIs | pending | |
@@ -224,19 +224,30 @@ and correctly refusing the 43 genuine unknowns.
 
 ---
 
-# Phase 8 — Evidence builder
+# ✅ Phase 8 — Evidence builder
 
-Every resolved exception gets an evidence package: the records cited, each with
-a signed `amount_contribution`.
+**Built:** `backend/agents/evidence.py`, 14 tests.
 
-**The rule that makes "I don't know" computable:**
+Phase 7 checked a cited record **exists**. That was not enough — a model could
+cite a real ₹20 fee row and claim it accounted for ₹500. The residual would
+close and the case would resolve on a number the record never contained.
+
+Now code derives what each record could **legitimately** account for, straight
+from the record and its settlement lines, and rejects any claim that does not
+match:
 
 ```
-unexplained_amount = delta − Σ evidence.amount_contribution
-RESOLVED requires unexplained_amount == 0 (within tolerance)
+the model reasons about WHICH records matter
+the code decides WHAT those records contain
 ```
 
-Evidence rows must cite real record IDs — validated against `ops` before saving.
+Rejections are stored with the reason and the amounts the record *could* have
+supported, so a reviewer sees why a claim failed rather than that it vanished.
+
+**Zero-delta exceptions** (duplicate charge, late settlement) have no money to
+apportion, so evidence there *corroborates* rather than accounts — a citation of
+zero against a real record stands. Without that, every rule-detected exception
+escalated no matter how well the agent reasoned.
 
 ---
 

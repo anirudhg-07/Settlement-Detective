@@ -93,8 +93,9 @@ def opening_message(
             f"correctly but should not have moved, or arrived later than it "
             f"was owed.\n"
             f"Check the records and decide whether this is a genuine problem. "
-            f"If it is, cite the records that show it and report the amount at "
-            f"risk as evidence with amount_paise 0, since no money is missing. "
+            f"If it is, cite the records that prove it - both payments for a "
+            f"duplicate charge, the settlement for a late one - each with "
+            f"amount_paise 0, since no money is missing. "
             f"If the records do not support the rule's suspicion, say so."
         )
     return (

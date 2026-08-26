@@ -126,11 +126,13 @@ def show_trace(result) -> None:
     print(f"  {'─' * 66}")
     print(f"  cause      : {result.cause_type}")
     print(f"  summary    : {result.summary[:200]}")
-    for e in result.evidence:
-        print(f"    evidence : {e['record_type']:<16}{e['record_id']:<22}"
-              f"{format_paise(int(e['amount_paise'])):>12}")
-    for e in result.rejected_evidence:
-        print(f"    REJECTED : {e.get('record_id')} — {e.get('reason')}")
+    for c in result.evidence:
+        print(f"    evidence : {c.record_type:<16}{c.record_id:<22}"
+              f"{format_paise(c.claimed):>12}   ✓ verified")
+    for c in result.rejected_evidence:
+        print(f"    REJECTED : {c.record_type:<16}{c.record_id:<22}"
+              f"{format_paise(c.claimed):>12}")
+        print(f"               {c.reason}")
     print(f"  delta      : {format_paise(result.delta)}")
     print(f"  unexplained: {format_paise(result.unexplained_amount or 0)}")
     print(f"  status     : {result.final_status}"

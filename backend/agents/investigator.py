@@ -29,6 +29,12 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import Connection, text
 
+from backend.agents.evidence import (
+    Citation,
+    EvidencePackage,
+    build_package,
+    verify_citations,
+)
 from backend.agents.llm import GeminiProvider, LLMError, LLMResponse
 from backend.agents.prompts import PROMPT_VERSION, SYSTEM_PROMPT, opening_message
 from backend.agents.tools import (
@@ -42,18 +48,6 @@ from backend.config import FinancialConfig
 from backend.enums import ExceptionStatus, ExceptionType, InvestigationMode
 from backend.models import Evidence, Investigation, InvestigationStep
 from backend.money import format_paise
-
-#: Which ops table holds each citable record type, and its id column.
-RECORD_TABLES: dict[str, tuple[str, str]] = {
-    "payment": ("ops.payments", "payment_id"),
-    "order": ("ops.orders", "order_id"),
-    "fee": ("ops.fees", "fee_id"),
-    "refund": ("ops.refunds", "refund_id"),
-    "adjustment": ("ops.adjustments", "adjustment_id"),
-    "settlement": ("ops.settlements", "settlement_id"),
-    "settlement_item": ("ops.settlement_items", "item_id"),
-}
-
 
 @dataclass
 class Step:
@@ -80,8 +74,9 @@ class Result:
     reasoning_confidence: int | None = None
     unexplained_amount: int | None = None
     final_status: str = ExceptionStatus.UNRESOLVED.value
-    evidence: list[dict] = field(default_factory=list)
-    rejected_evidence: list[dict] = field(default_factory=list)
+    evidence: list[Citation] = field(default_factory=list)
+    rejected_evidence: list[Citation] = field(default_factory=list)
+    package: EvidencePackage | None = None
     steps: list[Step] = field(default_factory=list)
     tool_call_count: int = 0
     input_tokens: int = 0
@@ -105,89 +100,6 @@ def _emit(result: "Result", on_step, step: Step) -> None:
 def _investigation_id(exception_id: str, model: str) -> str:
     digest = hashlib.sha1(f"{exception_id}:{model}:{PROMPT_VERSION}".encode()).hexdigest()
     return f"inv_{digest[:16]}"
-
-
-def _has_no_settled_credit(conn: Connection, payment_id: str) -> bool:
-    """True when no processed batch ever credited this payment.
-
-    Code checks this, not the model. It is what makes MISSING_SETTLEMENT the
-    one cause a payment may legitimately cite itself for: the explanation is
-    the *absence* of a settlement line, and no other record exists to point at.
-    """
-    return not conn.execute(
-        text(
-            "SELECT 1 FROM ops.settlement_items i"
-            "  JOIN ops.settlements s USING (settlement_id)"
-            " WHERE i.payment_id = :p AND i.item_type = 'PAYMENT'"
-            "   AND s.status = 'processed' LIMIT 1"
-        ),
-        {"p": payment_id},
-    ).scalar()
-
-
-def _verify_evidence(
-    conn: Connection,
-    items: list[dict],
-    *,
-    payment_id: str,
-    cause_type: str,
-) -> tuple[list[dict], list[dict]]:
-    """Keep only evidence that both exists and actually explains something.
-
-    Two guards, and the second matters more than the first.
-
-    **The record must exist.** A model that invents `rfnd_XXXX` to make the
-    numbers work produces evidence that fails to verify, so the residual stays
-    unexplained and the case escalates.
-
-    **A record may not explain itself.** Citing the payment under
-    investigation as the reason its own settlement is short restates the
-    problem rather than solving it - and because the cited amount equals the
-    whole delta, it drives the residual to zero and manufactures a confident
-    RESOLVED out of nothing. That is a false-resolution generator, and false
-    resolutions are the one number this product cannot afford.
-
-    The single exception is MISSING_SETTLEMENT, where the explanation *is* an
-    absence and no other record exists to point at. Even then the absence is
-    confirmed by querying the database, never by taking the model's word.
-    """
-    kept: list[dict] = []
-    rejected: list[dict] = []
-    for item in items:
-        table = RECORD_TABLES.get(str(item.get("record_type", "")).lower())
-        record_id = item.get("record_id")
-        amount = item.get("amount_paise")
-        if table is None or not isinstance(record_id, str):
-            rejected.append({**item, "reason": "unknown record_type or malformed id"})
-            continue
-        if not isinstance(amount, int):
-            rejected.append({**item, "reason": "amount_paise must be an integer"})
-            continue
-
-        if record_id == payment_id:
-            if cause_type == ExceptionType.MISSING_SETTLEMENT.value and (
-                _has_no_settled_credit(conn, payment_id)
-            ):
-                kept.append({**item, "verified_absence": True})
-            else:
-                rejected.append(
-                    {
-                        **item,
-                        "reason": "a payment cannot be the evidence for its own "
-                        "discrepancy; cite the record that accounts for the money",
-                    }
-                )
-            continue
-
-        name, column = table
-        exists = conn.execute(
-            text(f"SELECT 1 FROM {name} WHERE {column} = :v"), {"v": record_id}
-        ).scalar()
-        if exists:
-            kept.append(item)
-        else:
-            rejected.append({**item, "reason": f"no such record in {name}"})
-    return kept, rejected
 
 
 def investigate(
@@ -324,13 +236,23 @@ def _apply_finding(
     raw_evidence = args.get("evidence") or []
     if not isinstance(raw_evidence, list):
         raw_evidence = []
-    kept, rejected = _verify_evidence(
+    citations = verify_citations(
         conn,
         [e for e in raw_evidence if isinstance(e, dict)],
         payment_id=result.payment_id,
+        delta=result.delta,
+        cause_type=result.cause_type,
+        tolerance=cfg.tolerance_paise,
+    )
+    package = build_package(
+        citations,
+        payment_id=result.payment_id,
+        delta=result.delta,
         cause_type=result.cause_type,
     )
-    result.evidence, result.rejected_evidence = kept, rejected
+    result.package = package
+    result.evidence = package.verified
+    result.rejected_evidence = package.rejected
 
     if declared_unresolved:
         # The model said it cannot explain this. Its citations do not then get
@@ -340,11 +262,9 @@ def _apply_finding(
         result.final_status = ExceptionStatus.ESCALATED.value
         return
 
-    explained = sum(int(e["amount_paise"]) for e in kept)
-    result.unexplained_amount = result.delta - explained
-    within_tolerance = abs(result.unexplained_amount) <= cfg.tolerance_paise
+    result.unexplained_amount = package.unexplained
 
-    if not kept:
+    if not package.verified:
         # Nothing survived verification, so nothing has been explained.
         result.unexplained_amount = result.delta
         result.final_status = ExceptionStatus.ESCALATED.value
@@ -352,12 +272,13 @@ def _apply_finding(
         # "Resolved as unknown" is a contradiction. If the cause is unknown the
         # case belongs with a human, whatever the arithmetic came to.
         result.final_status = ExceptionStatus.ESCALATED.value
-    elif within_tolerance:
+    elif abs(package.unexplained) <= cfg.tolerance_paise:
         result.final_status = ExceptionStatus.RESOLVED.value
     else:
         # Partly explained. A human sees it with the residual stated - the
         # system never rounds a leftover away to claim a resolution.
         result.final_status = ExceptionStatus.REVIEW.value
+
 
 
 # --------------------------------------------------------------------------
@@ -410,24 +331,26 @@ def persist(conn: Connection, result: Result) -> None:
         {
             "evidence_id": f"{result.investigation_id}_ev{i:02d}",
             "investigation_id": result.investigation_id,
-            "record_type": e["record_type"],
-            "record_id": e["record_id"],
+            "record_type": c.record_type,
+            "record_id": c.record_id,
             "role": "SUPPORTS",
-            "amount_contribution": int(e["amount_paise"]),
-            "note": (e.get("note") or "")[:2000],
+            "amount_contribution": c.claimed,
+            "note": c.note,
         }
-        for i, e in enumerate(result.evidence)
+        for i, c in enumerate(result.evidence)
     ] + [
+        # Rejections are recorded, not silently dropped: a reviewer must be
+        # able to see what the model claimed and exactly why it did not stand.
         {
             "evidence_id": f"{result.investigation_id}_rj{i:02d}",
             "investigation_id": result.investigation_id,
-            "record_type": str(e.get("record_type", "unknown"))[:32],
-            "record_id": str(e.get("record_id", "?"))[:64],
+            "record_type": c.record_type[:32],
+            "record_id": c.record_id[:64],
             "role": "CONTRADICTS",
             "amount_contribution": None,
-            "note": f"REJECTED: {e.get('reason')}",
+            "note": f"REJECTED ({c.reason}) - claimed {c.claimed} paise. {c.note}"[:2000],
         }
-        for i, e in enumerate(result.rejected_evidence)
+        for i, c in enumerate(result.rejected_evidence)
     ]
     if rows:
         conn.execute(Evidence.__table__.insert(), rows)

@@ -18,8 +18,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 5 | Deterministic reconciliation engine | ✅ done |
 | 6 | Exception classification | ✅ done |
 | 7 | AI investigation agent | ✅ done |
-| 8 | Evidence builder | next |
-| 9–16 | Confidence → audit → Razorpay → UI → evaluation | pending |
+| 8 | Evidence builder | ✅ done |
+| 9 | Confidence / safety layer | next |
+| 10–16 | Audit → Razorpay → APIs → UI → evaluation | pending |
 
 ## Quick start
 
@@ -99,6 +100,7 @@ backend/
     tools.py               the controlled tool surface (sd_agent only)
     prompts.py             versioned system prompt
     investigator.py        the loop + the false-resolution guards
+    evidence.py            what each record can actually support
   models/                  ops / recon / gt schemas
   db/session.py            one engine per database role
 alembic/versions/          0001 schemas · 0002 tables · 0003 roles + grants
