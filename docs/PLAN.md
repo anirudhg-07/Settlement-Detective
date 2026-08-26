@@ -16,9 +16,9 @@ Working checklist for the build. Six of sixteen phases done.
 | 3 | Synthetic data generator | ✅ done | 109 |
 | 4 | Exception injection | ✅ done | 130 |
 | 5 | Deterministic reconciliation engine | ✅ done | 146 |
-| 6 | Exception classification | ✅ done | **162** |
-| 7 | AI investigation agent | ⬅️ **next** | |
-| 8 | Evidence builder | pending | |
+| 6 | Exception classification | ✅ done | 162 |
+| 7 | AI investigation agent | ✅ done | **186** |
+| 8 | Evidence builder | ⬅️ **next** | |
 | 9 | Confidence / safety layer | pending | |
 | 10 | Audit trail | pending | |
 | 11 | Razorpay Test Mode integration | pending | |
@@ -176,12 +176,32 @@ exists to close.
 
 ---
 
-# ⬅️ Phase 7 — AI investigation agent
+# ✅ Phase 7 — AI investigation agent
 
 **Goal:** investigate the exceptions the baseline cannot close, using tools —
 never by being handed the database.
 
-**Needs:** `LLM_API_KEY` in `.env` (console.anthropic.com).
+**Built:** `backend/agents/{llm,tools,prompts,investigator}.py`,
+`scripts/investigate.py`, 24 tests (almost all against a scripted fake model,
+so the safety rules are exercised without spending quota).
+
+**Three infrastructure bugs found and fixed:**
+- macOS framework Python has an empty CA store — every HTTPS call failed with a
+  certificate error pointing nowhere near the cause. Fixed with `httpx`.
+- The network advertises IPv6 without a working route to Google, so requests
+  wedged in `SYN_SENT` and hung with no error. Fixed by forcing IPv4.
+- `gemini-2.5-flash-lite` is retired for new keys; the live model is
+  `gemini-3.5-flash-lite`.
+
+**The safety hole the first live run exposed:** the model cited *the payment
+under investigation* as evidence for its own discrepancy. The cited amount
+equalled the whole delta, so the residual went to zero and produced a confident
+`RESOLVED` — a false-resolution generator. Now blocked: a record cannot explain
+itself (except `MISSING_SETTLEMENT`, where the database verifies the absence),
+`unresolved=true` keeps the full residual, and "resolved as unknown" is refused
+as a contradiction.
+
+**Needs:** `LLM_API_KEY` in `.env`
 
 **Build:**
 - `backend/agents/tools.py` — the controlled tool surface:

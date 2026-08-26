@@ -17,8 +17,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 4 | Exception injection | ✅ done |
 | 5 | Deterministic reconciliation engine | ✅ done |
 | 6 | Exception classification | ✅ done |
-| 7 | AI investigation agent | next |
-| 8–16 | Evidence → confidence → audit → UI → evaluation | pending |
+| 7 | AI investigation agent | ✅ done |
+| 8 | Evidence builder | next |
+| 9–16 | Confidence → audit → Razorpay → UI → evaluation | pending |
 
 ## Quick start
 
@@ -93,6 +94,11 @@ backend/
     exceptions.py          13 injectors + ground truth
     verify.py              in-memory reconciliation: a clean world must be 100%
     persist.py             dependency-ordered bulk load
+  agents/
+    llm.py                 provider adapter: cached, throttled, IPv4-forced
+    tools.py               the controlled tool surface (sd_agent only)
+    prompts.py             versioned system prompt
+    investigator.py        the loop + the false-resolution guards
   models/                  ops / recon / gt schemas
   db/session.py            one engine per database role
 alembic/versions/          0001 schemas · 0002 tables · 0003 roles + grants
@@ -101,6 +107,7 @@ docs/ASSUMPTIONS.md        every assumption that changes a number
 scripts/verify_model.py    the worked examples, printed
 scripts/generate_data.py   generate, verify, then load the dataset
 scripts/reconcile.py       run the engine, score it against ground truth
+scripts/investigate.py     run the AI agent (checkpointed, cached, budgeted)
 ```
 
 ## Documentation

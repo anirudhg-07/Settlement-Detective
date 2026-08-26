@@ -133,6 +133,20 @@ class Settings(BaseSettings):
     evidence_auto_resolve: int = 90
     evidence_review_min: int = 60
 
+    # ---- LLM (Phase 7) --------------------------------------------------
+    llm_provider: str = "gemini"
+    llm_model: str = "gemini-3.5-flash-lite"
+    llm_api_key: str = ""
+    #: Hard ceiling on tool calls per investigation. Protects both the quota
+    #: and the context window - an agent that cannot decide in this many hops
+    #: should escalate, not keep digging.
+    llm_max_tool_calls: int = 8
+    #: Free-tier request ceiling per minute. The client self-throttles to it.
+    llm_rpm: int = 15
+    #: Cache every raw LLM response to disk. Re-scoring, re-analysis and UI
+    #: work then replay for free instead of spending quota again.
+    llm_cache_enabled: bool = True
+
     def financial(self) -> FinancialConfig:
         return FinancialConfig(
             tolerance_paise=self.tolerance_paise,
