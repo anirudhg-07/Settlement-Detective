@@ -173,6 +173,11 @@ class Investigation(Base):
     tool_call_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     tokens_used: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    #: The named deductions behind `evidence_score`. Storing only the number
+    #: leaves an auditor unable to answer "why 41?" from the record itself.
+    score_factors: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    #: Every financial record this investigation actually looked at (s24).
+    records_examined: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     exception: Mapped["Exception_"] = relationship(back_populates="investigations")
     steps: Mapped[list["InvestigationStep"]] = relationship(
@@ -206,6 +211,10 @@ class InvestigationStep(Base):
     observation: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     created_at: Mapped[datetime] = ts_col(nullable=False)
+    #: Hash chain. Each step commits to the one before it, so an edited or
+    #: reordered row stops matching and the break is locatable.
+    prev_hash: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
 
     investigation: Mapped["Investigation"] = relationship(back_populates="steps")
 

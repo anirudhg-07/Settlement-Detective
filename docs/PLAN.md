@@ -19,9 +19,9 @@ Working checklist for the build. Six of sixteen phases done.
 | 6 | Exception classification | ✅ done | 162 |
 | 7 | AI investigation agent | ✅ done | 186 |
 | 8 | Evidence builder | ✅ done | 200 |
-| 9 | Confidence / safety layer | ✅ done | **223** |
-| 10 | Audit trail | ⬅️ **next** | |
-| 11 | Razorpay Test Mode integration | pending | |
+| 9 | Confidence / safety layer | ✅ done | 223 |
+| 10 | Audit trail | ✅ done | **239** |
+| 11 | Razorpay Test Mode integration | ⬅️ **next** | |
 | 12 | Backend APIs | pending | |
 | 13 | Frontend dashboard | pending | |
 | 14 | Evaluation | pending | |
@@ -288,14 +288,35 @@ and easy to state.
 > **is**, never what it would explain. Cases 3 and 4 still resolve without it,
 > which shows the real fix was stating the absence, not doing the matching.
 
-# Phase 10 — Audit trail
+# ✅ Phase 10 — Audit trail
 
-Mostly built already: `investigations` + `investigation_steps` exist and are
-append-only by grant. Remaining work is completeness — every tool call, argument,
-result, and timing recorded, and a query that reconstructs an investigation
-end to end for the UI.
+**Built:** `backend/audit/trail.py`, `scripts/audit.py`, migration `0007`,
+16 tests.
 
----
+Three gaps closed:
+
+**The score is now explainable from the database.** `evidence_score = 41` alone
+leaves an auditor unable to answer "why 41?". `score_factors` stores the named
+deductions.
+
+**`records_examined`** — every financial record the investigation touched,
+extracted from the stored tool calls (spec §24).
+
+**A hash chain over the steps.** Each step commits to the one before it.
+Demonstrated live: an owner editing step 2 is caught at seq 2; deleting step 2
+is caught at seq 3.
+
+> **Tamper evidence, not tamper proofing.** Someone who rewrites every hash
+> from the tampered step onward would pass. Defeating that needs the chain head
+> anchored outside this database — a production concern, deliberately not
+> pretended at. Combined with the grants (agent has INSERT, no UPDATE/DELETE),
+> the practical guarantee is: *the system that writes the trail cannot alter it,
+> and anyone else who does will be seen.*
+
+`scripts/audit.py` reconstructs any investigation end to end — timeline, tool
+calls, records examined, evidence, score derivation, integrity check. That
+output is Screens 3 and 4 in text form, so the frontend has a defined contract
+to render rather than a shape to invent.
 
 # Phase 11 — Razorpay Test Mode
 
