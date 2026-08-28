@@ -29,7 +29,7 @@ from sqlalchemy import text
 from backend.agents.investigator import investigate, persist
 from backend.agents.llm import LLMError, ResponseCache, build_provider
 from backend.config import get_settings
-from backend.db.session import agent_engine
+from backend.db.session import agent_engine, owner_engine
 from backend.money import format_paise
 
 
@@ -122,6 +122,14 @@ def live_step(step) -> None:
         print(f"      [{step.seq:>2}] ⚠ {step.observation}", flush=True)
 
 
+def _score_lines(result) -> list[str]:
+    """The deductions, so a reviewer sees why a case scored what it did."""
+    out = [f"{'score':<40}{100:>6}   starting"]
+    for f in result.score_factors:
+        out.append(f"{'  ' + f.name:<40}{f.delta:>+6}   {f.detail[:60]}")
+    return out
+
+
 def show_trace(result) -> None:
     print(f"  {'─' * 66}")
     print(f"  cause      : {result.cause_type}")
@@ -135,8 +143,12 @@ def show_trace(result) -> None:
         print(f"               {c.reason}")
     print(f"  delta      : {format_paise(result.delta)}")
     print(f"  unexplained: {format_paise(result.unexplained_amount or 0)}")
+    print()
+    for line in result.score_factors and _score_lines(result) or []:
+        print(f"  {line}")
     print(f"  status     : {result.final_status}"
-          f"   (model said it was {result.reasoning_confidence}% sure)")
+          f"   evidence score {result.evidence_score}"
+          f"   (model claimed {result.reasoning_confidence}%)")
 
 
 def main() -> int:
@@ -165,6 +177,9 @@ def main() -> int:
 
     outcomes: dict[str, int] = defaultdict(int)
     correct_shape = 0
+    #: (overclaim, claimed, computed) - evidence that the model's own
+    #: confidence is not a number anything should act on.
+    confidence_gaps: list[tuple[int, int, int]] = []
 
     for n, row in enumerate(selected, 1):
         if provider.requests_made >= args.max_requests:
@@ -190,14 +205,33 @@ def main() -> int:
             persist(conn, result)
             conn.commit()
 
+        # The agent role is read-only on `exceptions` by design, so the case
+        # status is written back by the owner. The agent records what it found;
+        # it does not get to close its own ticket.
+        with owner_engine().begin() as writer:
+            writer.execute(
+                text(
+                    "UPDATE recon.exceptions SET status = :s, evidence_score = :e"
+                    " WHERE exception_id = :i"
+                ),
+                {"s": result.final_status, "e": result.evidence_score,
+                 "i": row["exception_id"]},
+            )
+
         outcomes[result.final_status] += 1
         correct_shape += int(result.cause_type == row["exception_type"])
+        if result.reasoning_confidence is not None and result.evidence_score is not None:
+            confidence_gaps.append(
+                (result.reasoning_confidence - result.evidence_score,
+                 result.reasoning_confidence, result.evidence_score)
+            )
         if args.show:
             show_trace(result)
         else:
-            print(f"      → {result.final_status:<10} {result.cause_type:<24}"
+            print(f"      → {result.final_status:<10} score {result.evidence_score:>3}"
+                  f"  {result.cause_type:<24}"
                   f" unexplained {format_paise(result.unexplained_amount or 0)}"
-                  f"  ({result.tool_call_count} tools, {result.latency_ms}ms)")
+                  f"  ({result.tool_call_count} tools)")
 
     done = sum(outcomes.values())
     print(f"\n{'═' * 72}")
@@ -205,6 +239,13 @@ def main() -> int:
     for status, count in sorted(outcomes.items(), key=lambda kv: -kv[1]):
         print(f"    {status:<18}{count:>5}")
     print(f"  agreed with the rule classifier   {correct_shape}/{done}")
+    if confidence_gaps:
+        worst = max(confidence_gaps)
+        print(f"\n  model's self-assessment vs computed score")
+        print(f"    largest overclaim   {worst[0]} points "
+              f"(said {worst[1]}%, scored {worst[2]})")
+        print(f"    mean overclaim      "
+              f"{sum(g[0] for g in confidence_gaps) / len(confidence_gaps):.0f} points")
     print(f"\n  API requests spent  {provider.requests_made}")
     print(f"  cache hits          {cache.hits}")
     print(f"  throttle wait       {provider.throttled_seconds:.1f}s")

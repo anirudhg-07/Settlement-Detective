@@ -18,9 +18,9 @@ Working checklist for the build. Six of sixteen phases done.
 | 5 | Deterministic reconciliation engine | ✅ done | 146 |
 | 6 | Exception classification | ✅ done | 162 |
 | 7 | AI investigation agent | ✅ done | 186 |
-| 8 | Evidence builder | ✅ done | **200** |
-| 9 | Confidence / safety layer | ⬅️ **next** | |
-| 10 | Audit trail | pending | |
+| 8 | Evidence builder | ✅ done | 200 |
+| 9 | Confidence / safety layer | ✅ done | **223** |
+| 10 | Audit trail | ⬅️ **next** | |
 | 11 | Razorpay Test Mode integration | pending | |
 | 12 | Backend APIs | pending | |
 | 13 | Frontend dashboard | pending | |
@@ -251,22 +251,42 @@ escalated no matter how well the agent reasoned.
 
 ---
 
-# Phase 9 — Confidence / safety layer
+# ✅ Phase 9 — Confidence / safety layer
 
-Two numbers, deliberately separate:
-- `reasoning_confidence` — what the model says. **Recorded, never trusted.**
-- `evidence_score` — computed by code from: records found, arithmetic fully
-  reconciling, no conflicting records, unexplained residual, known pattern.
+**Built:** `backend/agents/scoring.py`, 24 tests, plus a tool fix.
 
-| Score | Outcome |
+Two numbers look like confidence; only one may decide anything.
+
+| | |
 |---|---|
-| ≥ 90 | `RESOLVED` |
-| 60–89 | `REVIEW` |
-| < 60 | `ESCALATED` |
+| `reasoning_confidence` | what the model says about itself — **recorded, never read** |
+| `evidence_score` | computed from facts — routes the case |
 
-Thresholds live in `FinancialConfig` and are already wired.
+The score starts at 100 and loses points for **named** reasons, because a
+reviewer needs to see *why* a case scored what it did. Some conditions are
+disqualifying rather than costly (LLM outage, agent declined, nothing verified,
+cause unknown) and drive the score to zero outright.
 
----
+`score_investigation()` does not take confidence as a parameter at all, so no
+future edit can quietly start weighting it. There is a test asserting that.
+
+**Why this matters, from the live run:** the model reported **100% certainty on
+a case that scored 0**. A number that behaves that way cannot be allowed near a
+financial decision.
+
+**Tool fix (the missing-refund case).** The bundle now states each refund's
+`debit_status` — `NEVER_DEBITED`, `SCHEDULED_BUT_NOT_PAID_OUT`,
+`DEBITED_WRONG_AMOUNT`. Previously the agent had to notice that *nothing in the
+settlement lines referenced the refund* — a negative inference across two
+arrays, which models are bad at and people are too. Absences are hard to see
+and easy to state.
+
+> **A line held deliberately.** A first version also emitted
+> `would_account_for` per record — pre-matching each record against the delta.
+> That lifted results to 5/5, but matching a record to the discrepancy *is* the
+> investigation. It was removed: the tools state what each record's condition
+> **is**, never what it would explain. Cases 3 and 4 still resolve without it,
+> which shows the real fix was stating the absence, not doing the matching.
 
 # Phase 10 — Audit trail
 
