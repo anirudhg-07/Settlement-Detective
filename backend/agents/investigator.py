@@ -36,6 +36,7 @@ from backend.agents.evidence import (
     verify_citations,
 )
 from backend.agents.llm import GeminiProvider, LLMError, LLMResponse
+from backend.agents.scoring import EvidenceScore, Factor, score_investigation
 from backend.agents.prompts import PROMPT_VERSION, SYSTEM_PROMPT, opening_message
 from backend.agents.tools import (
     SUBMIT_FINDING,
@@ -77,8 +78,12 @@ class Result:
     evidence: list[Citation] = field(default_factory=list)
     rejected_evidence: list[Citation] = field(default_factory=list)
     package: EvidencePackage | None = None
+    #: Computed by code from the evidence. This is what routes the case.
+    evidence_score: int | None = None
+    score_factors: tuple[Factor, ...] = ()
     steps: list[Step] = field(default_factory=list)
     tool_call_count: int = 0
+    max_tool_calls: int = 8
     input_tokens: int = 0
     output_tokens: int = 0
     llm_requests: int = 0
@@ -129,6 +134,7 @@ def investigate(
         delta=delta,
         started_at=started,
         model=provider.model,
+        max_tool_calls=max_tool_calls,
     )
     ctx = ToolContext(conn=conn, cfg=cfg, as_of=as_of)
     history = [
@@ -213,6 +219,17 @@ def investigate(
     if result.error:
         seq += 1
         _emit(result, on_step, Step(seq=seq, step_type="error", observation=result.error))
+        scored = score_investigation(
+            package=result.package
+            or build_package([], payment_id=payment_id, delta=delta,
+                             cause_type=ExceptionType.UNKNOWN_DISCREPANCY.value),
+            cause_type=result.cause_type or ExceptionType.UNKNOWN_DISCREPANCY.value,
+            declared_unresolved=False,
+            cfg=cfg,
+            error=result.error,
+        )
+        result.evidence_score = scored.score
+        result.score_factors = scored.factors
         result.final_status = ExceptionStatus.UNRESOLVED.value
         result.unexplained_amount = delta
         result.cause_type = result.cause_type or ExceptionType.UNKNOWN_DISCREPANCY.value
@@ -230,6 +247,7 @@ def _apply_finding(
     result.cause_type = args.get("cause_type") or ExceptionType.UNKNOWN_DISCREPANCY.value
     result.summary = (args.get("summary") or "").strip()
     confidence = args.get("confidence")
+    # Recorded for analysis, never read by any decision below.
     result.reasoning_confidence = confidence if isinstance(confidence, int) else None
     declared_unresolved = bool(args.get("unresolved"))
 
@@ -254,36 +272,36 @@ def _apply_finding(
     result.evidence = package.verified
     result.rejected_evidence = package.rejected
 
-    if declared_unresolved:
-        # The model said it cannot explain this. Its citations do not then get
-        # to zero the residual - an escalation that reports "nothing
-        # unexplained" tells a human the opposite of what it means.
-        result.unexplained_amount = result.delta
-        result.final_status = ExceptionStatus.ESCALATED.value
-        return
-
-    result.unexplained_amount = package.unexplained
-
-    if not package.verified:
-        # Nothing survived verification, so nothing has been explained.
-        result.unexplained_amount = result.delta
-        result.final_status = ExceptionStatus.ESCALATED.value
-    elif result.cause_type == ExceptionType.UNKNOWN_DISCREPANCY.value:
-        # "Resolved as unknown" is a contradiction. If the cause is unknown the
-        # case belongs with a human, whatever the arithmetic came to.
-        result.final_status = ExceptionStatus.ESCALATED.value
-    elif abs(package.unexplained) <= cfg.tolerance_paise:
-        result.final_status = ExceptionStatus.RESOLVED.value
-    else:
-        # Partly explained. A human sees it with the residual stated - the
-        # system never rounds a leftover away to claim a resolution.
-        result.final_status = ExceptionStatus.REVIEW.value
+    scored = score_investigation(
+        package=package,
+        cause_type=result.cause_type,
+        declared_unresolved=declared_unresolved,
+        cfg=cfg,
+        data_flags=_data_flags(conn, result.payment_id),
+        tool_calls=result.tool_call_count,
+        max_tool_calls=result.max_tool_calls,
+    )
+    result.evidence_score = scored.score
+    result.score_factors = scored.factors
+    result.final_status = scored.band.value
+    # An escalation that reports "nothing unexplained" tells a human the
+    # opposite of what it means, so a case the agent could not close carries
+    # its full discrepancy forward.
+    result.unexplained_amount = (
+        result.delta if scored.score == 0 else package.unexplained
+    )
 
 
-
-# --------------------------------------------------------------------------
-# Persistence
-# --------------------------------------------------------------------------
+def _data_flags(conn: Connection, payment_id: str) -> tuple[str, ...]:
+    """Data-quality problems the reconciler already noticed for this payment."""
+    row = conn.execute(
+        text(
+            "SELECT flags FROM recon.recon_results WHERE payment_id = :p"
+            " ORDER BY computed_at DESC LIMIT 1"
+        ),
+        {"p": payment_id},
+    ).scalar()
+    return tuple(row) if row else ()
 
 
 def persist(conn: Connection, result: Result) -> None:
@@ -299,7 +317,7 @@ def persist(conn: Connection, result: Result) -> None:
             "llm_model": result.model,
             "prompt_version": PROMPT_VERSION,
             "reasoning_confidence": result.reasoning_confidence,
-            "evidence_score": None,  # Phase 9 computes this
+            "evidence_score": result.evidence_score,
             "decision": result.summary,
             "final_status": result.final_status,
             "unexplained_amount": result.unexplained_amount,

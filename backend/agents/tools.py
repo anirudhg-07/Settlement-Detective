@@ -36,6 +36,7 @@ from backend.enums import ExceptionType, PaymentMethod, PaymentStatus, RefundSta
 from backend.money import format_paise
 from backend.reconciliation.settlement_math import (
     AdjustmentFact,
+    component_is_due,
     PaymentFacts,
     RefundFact,
     expected_net_settlement,
@@ -175,6 +176,71 @@ def _settlement_lines(ctx: ToolContext, payment_id: str, refund_ids: list[str],
 # --------------------------------------------------------------------------
 
 
+
+def _refund_debit_status(refunds: list[dict], lines: list[dict], ctx: ToolContext) -> dict:
+    """For each refund, whether its debit actually left the account.
+
+    A refund that is due but has no settlement line is the single most common
+    cause of a positive discrepancy, and the hardest to see: it shows up as the
+    *absence* of a row in a different list. Code checks it once and says so.
+    """
+    by_refund: dict[str, list[dict]] = {}
+    for line in lines:
+        if line["refund_id"]:
+            by_refund.setdefault(line["refund_id"], []).append(line)
+
+    out: dict[str, dict] = {}
+    for refund in refunds:
+        rid = refund["refund_id"]
+        mine = by_refund.get(rid, [])
+        debited = -sum(l["net_amount"] for l in mine if l["batch_status"] == "processed")
+        scheduled = [l for l in mine if l["batch_status"] != "processed"]
+        amount = refund["amount"]
+
+        if refund["status"] != RefundStatus.PROCESSED.value:
+            status = "NOT_PROCESSED"
+        elif not component_is_due(refund["processed_at"], ctx.as_of, ctx.cfg):
+            status = "NOT_YET_DUE"
+        elif debited == 0 and scheduled:
+            status = "SCHEDULED_BUT_NOT_PAID_OUT"
+        elif debited == 0:
+            status = "NEVER_DEBITED"
+        elif debited != amount:
+            status = "DEBITED_WRONG_AMOUNT"
+        else:
+            status = "DEBITED"
+
+        # What the refund's state IS - not what it would explain. Matching a
+        # record against the discrepancy is the investigation itself, and
+        # handing that over would leave the agent doing selection rather than
+        # reasoning, making any later comparison against the rule engine
+        # meaningless.
+        out[rid] = {
+            "debit_status": status,
+            "amount_actually_debited": _money(debited),
+            "in_unpaid_batches": [l["settlement_id"] for l in scheduled],
+        }
+    return out
+
+
+def _fee_deduction_status(fee: dict | None, settled: list[dict]) -> dict | None:
+    """Whether the fee actually deducted matches the fee on record."""
+    if not fee:
+        return None
+    deducted_fee = sum(l["debit_fee"] for l in settled)
+    deducted_tax = sum(l["debit_tax"] for l in settled)
+    gap = (fee["fee_amount"] - deducted_fee) + (fee["tax_amount"] - deducted_tax)
+    return {
+        "record_type": "fee",
+        "record_id": fee["fee_id"],
+        "recorded_fee": _money(fee["fee_amount"]),
+        "recorded_tax": _money(fee["tax_amount"]),
+        "actually_deducted_fee": _money(deducted_fee),
+        "actually_deducted_tax": _money(deducted_tax),
+        "matches_record": gap == 0,
+    }
+
+
 def get_case_bundle(ctx: ToolContext, payment_id: str) -> dict:
     """Everything about one payment, in a single call."""
     payment_id = _validate_id(payment_id, "pay", "payment_id")
@@ -188,6 +254,8 @@ def get_case_bundle(ctx: ToolContext, payment_id: str) -> dict:
     expected = expected_net_settlement(facts, ctx.cfg, as_of=ctx.as_of)
     settled = [l for l in lines if l["batch_status"] == "processed"]
     actual = sum(l["net_amount"] for l in settled)
+    refund_status = _refund_debit_status(records["refunds"], lines, ctx)
+    fee_status = _fee_deduction_status(records["fee"], settled)
 
     payment = records["payment"]
     return {
@@ -202,15 +270,7 @@ def get_case_bundle(ctx: ToolContext, payment_id: str) -> dict:
             "settlement_due_by": str(settlement_deadline(payment["captured_at"], ctx.cfg))
             if payment["captured_at"] else None,
         },
-        "fee": (
-            {
-                "fee_id": records["fee"]["fee_id"],
-                "fee": _money(records["fee"]["fee_amount"]),
-                "tax": _money(records["fee"]["tax_amount"]),
-                "rate_bps": records["fee"]["fee_rate_bps"],
-            }
-            if records["fee"] else None
-        ),
+        "fee": ({**fee_status} if fee_status else None),
         "refunds": [
             {
                 "refund_id": r["refund_id"],
@@ -219,6 +279,7 @@ def get_case_bundle(ctx: ToolContext, payment_id: str) -> dict:
                 "processed_at": str(r["processed_at"]) if r["processed_at"] else None,
                 "debit_due_by": str(settlement_eligible_on(r["processed_at"], ctx.cfg))
                 if r["processed_at"] else None,
+                **refund_status[r["refund_id"]],
             }
             for r in records["refunds"]
         ],
