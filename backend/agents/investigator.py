@@ -37,6 +37,7 @@ from backend.agents.evidence import (
 )
 from backend.agents.llm import GeminiProvider, LLMError, LLMResponse
 from backend.agents.scoring import EvidenceScore, Factor, score_investigation
+from backend.audit.trail import chain_steps, extract_record_ids
 from backend.agents.prompts import PROMPT_VERSION, SYSTEM_PROMPT, opening_message
 from backend.agents.tools import (
     SUBMIT_FINDING,
@@ -304,6 +305,17 @@ def _data_flags(conn: Connection, payment_id: str) -> tuple[str, ...]:
     return tuple(row) if row else ()
 
 
+def _records_examined(result: Result) -> set[str]:
+    """Every financial record the investigation actually looked at (s24)."""
+    seen: set[str] = {result.payment_id}
+    for step in result.steps:
+        seen |= extract_record_ids(step.tool_args)
+        seen |= extract_record_ids(step.tool_result)
+    for citation in result.evidence + result.rejected_evidence:
+        seen.add(citation.record_id)
+    return {r for r in seen if isinstance(r, str)}
+
+
 def persist(conn: Connection, result: Result) -> None:
     """Write the investigation, its steps and its evidence in one transaction."""
     conn.execute(
@@ -324,27 +336,34 @@ def persist(conn: Connection, result: Result) -> None:
             "tool_call_count": result.tool_call_count,
             "tokens_used": result.input_tokens + result.output_tokens,
             "latency_ms": result.latency_ms,
+            "score_factors": [
+                {"name": f.name, "delta": f.delta, "detail": f.detail}
+                for f in result.score_factors
+            ],
+            "records_examined": sorted(_records_examined(result)),
         },
     )
     if result.steps:
-        conn.execute(
-            InvestigationStep.__table__.insert(),
-            [
-                {
-                    "step_id": f"{result.investigation_id}_{s.seq:03d}",
-                    "investigation_id": result.investigation_id,
-                    "seq": s.seq,
-                    "step_type": s.step_type,
-                    "tool_name": s.tool_name,
-                    "tool_args": s.tool_args,
-                    "tool_result": s.tool_result,
-                    "observation": s.observation,
-                    "duration_ms": s.duration_ms,
-                    "created_at": result.started_at,
-                }
-                for s in result.steps
-            ],
-        )
+        rows = [
+            {
+                "step_id": f"{result.investigation_id}_{s.seq:03d}",
+                "investigation_id": result.investigation_id,
+                "seq": s.seq,
+                "step_type": s.step_type,
+                "tool_name": s.tool_name,
+                "tool_args": s.tool_args,
+                "tool_result": s.tool_result,
+                "observation": s.observation,
+                "duration_ms": s.duration_ms,
+                "created_at": result.started_at,
+            }
+            for s in result.steps
+        ]
+        # Each step commits to the one before it, so a row edited or reordered
+        # after the fact no longer matches and the break is locatable.
+        conn.execute(InvestigationStep.__table__.insert(), chain_steps(
+            result.investigation_id, rows
+        ))
     rows = [
         {
             "evidence_id": f"{result.investigation_id}_ev{i:02d}",
