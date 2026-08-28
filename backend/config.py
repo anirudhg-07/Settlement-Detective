@@ -146,6 +146,11 @@ class Settings(BaseSettings):
     #: limit leaves no headroom, and any jitter in round-trip time turns into a
     #: 429. Costs ~13 extra minutes on a 400-request run; worth it.
     llm_rpm: int = 10
+    # ---- Razorpay (Phase 11) --------------------------------------------
+    #: Test Mode only. Secret-key calls happen server-side and nowhere else.
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+
     #: Cache every raw LLM response to disk. Re-scoring, re-analysis and UI
     #: work then replay for free instead of spending quota again.
     llm_cache_enabled: bool = True
