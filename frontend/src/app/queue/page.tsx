@@ -5,10 +5,7 @@ import Link from "next/link";
 import styles from "./page.module.css";
 import { useRouter, useSearchParams } from "next/navigation";
 
-interface Money {
-  paise: number;
-  display: string;
-}
+interface Money { paise: number; display: string; }
 
 interface ExceptionSummary {
   exception_id: string;
@@ -23,9 +20,19 @@ interface ExceptionSummary {
   created_at: string;
 }
 
-interface ExceptionPage {
-  items: ExceptionSummary[];
-  total: number;
+interface ExceptionPage { items: ExceptionSummary[]; total: number; }
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    RESOLVED:     { label: "Resolved",     cls: styles.badgeVerified },
+    ESCALATED:    { label: "Escalated",    cls: styles.badgeAttention },
+    REJECTED:     { label: "Rejected",     cls: styles.badgeNegative },
+    DETECTED:     { label: "Detected",     cls: styles.badgeNeutral },
+    INVESTIGATING:{ label: "Investigating", cls: styles.badgeNeutral },
+    REVIEW:       { label: "Review",       cls: styles.badgeAttention },
+  };
+  const cfg = map[status] || { label: status, cls: styles.badgeNeutral };
+  return <span className={`${styles.badge} ${cfg.cls}`}><span className={styles.badgeDot} />{cfg.label}</span>;
 }
 
 function QueueContent() {
@@ -40,17 +47,11 @@ function QueueContent() {
     async function loadData() {
       setLoading(true);
       try {
-        let url = "/api/exceptions?limit=50";
-        if (filter === "needs_you") {
-          url += "&status=DETECTED&status=INVESTIGATING&status=ESCALATED";
-        } else if (filter === "auto_resolved") {
-          url += "&status=RESOLVED";
-        }
-
+        let url = "/api/exceptions?limit=100";
+        if (filter === "needs_you") url += "&status=DETECTED&status=INVESTIGATING&status=ESCALATED";
+        else if (filter === "auto_resolved") url += "&status=RESOLVED";
         const res = await fetch(url);
-        if (res.ok) {
-          setPage(await res.json());
-        }
+        if (res.ok) setPage(await res.json());
       } catch (err) {
         console.error(err);
       } finally {
@@ -60,87 +61,76 @@ function QueueContent() {
     loadData();
   }, [filter]);
 
-  const setFilter = (newFilter: string) => {
-    router.push(`/queue?filter=${newFilter}`);
+  const setFilter = (f: string) => router.push(`/queue?filter=${f}`);
+
+  const fmt = (paise: number) => {
+    if (paise === 0) return "₹0";
+    const r = Math.abs(paise) / 100;
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(r);
   };
 
-  const formatMoney = (paise: number) => {
-    const rupees = Math.abs(paise) / 100;
-    const formatted = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-    }).format(rupees);
-    return paise < 0 ? `−${formatted}` : `+${formatted}`;
-  };
-
-  const getStatusNode = (status: string) => {
-    let className = styles.statusNeutral;
-    let label = status;
-    switch (status) {
-      case "RESOLVED": 
-        className = styles.statusVerified;
-        label = "RESOLVED ✓";
-        break;
-      case "ESCALATED": 
-        className = styles.statusAttention;
-        label = "ESCALATED ↑";
-        break;
-      case "REVIEW":
-      case "DETECTED":
-      case "INVESTIGATING":
-        className = styles.statusAttention;
-        break;
-      case "REJECTED": 
-        className = styles.statusNegative;
-        label = "REJECTED ✗";
-        break;
-    }
-    return <span className={`${styles.statusBadge} ${className}`}>{label}</span>;
-  };
-
-  // Polyfill for missing "decision" in summary API
   const getWhyText = (type: string | null) => {
-    if (!type) return "Awaiting investigation.";
-    if (type.includes("MISSING_REFUND")) return "Refund was expected but never debited from payout.";
-    if (type.includes("MISSING_SETTLEMENT")) return "Payment captured but settlement never arrived.";
-    if (type.includes("FEE")) return "Charged fee differs from expected standard rate.";
-    if (type.includes("DUPLICATE")) return "Multiple settlement lines exist for one capture.";
-    return "Reconciliation engine flagged a discrepancy.";
+    if (!type) return "Awaiting investigation";
+    if (type.includes("MISSING_REFUND")) return "Refund expected but not debited from payout";
+    if (type.includes("MISSING_SETTLEMENT")) return "Payment captured but settlement never arrived";
+    if (type.includes("FEE")) return "Charged fee differs from expected rate";
+    if (type.includes("DUPLICATE")) return "Multiple settlement lines for one capture";
+    return "Discrepancy flagged by reconciliation engine";
   };
+
+  const tabs = [
+    { id: "needs_you", label: "Needs You", dot: styles.dotAttention },
+    { id: "auto_resolved", label: "Auto-resolved", dot: styles.dotVerified },
+    { id: "all", label: "All" },
+  ];
 
   return (
     <>
-      <div className={styles.header}>
+      <div className={styles.toolbar}>
         <div className={styles.tabs}>
-          <button
-            onClick={() => setFilter("needs_you")}
-            className={`${styles.tab} ${filter === "needs_you" ? styles.tabActive : ""}`}
-          >
-            Needs you
-          </button>
-          <button
-            onClick={() => setFilter("auto_resolved")}
-            className={`${styles.tab} ${filter === "auto_resolved" ? styles.tabActive : ""}`}
-          >
-            Auto-resolved
-          </button>
-          <button
-            onClick={() => setFilter("all")}
-            className={`${styles.tab} ${filter === "all" ? styles.tabActive : ""}`}
-          >
-            All
-          </button>
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setFilter(t.id)}
+              className={`${styles.tab} ${filter === t.id ? styles.tabActive : ""}`}
+            >
+              {t.dot && <span className={`${styles.tabDot} ${t.dot}`} />}
+              {t.label}
+              {page && filter === t.id && (
+                <span className={styles.tabCount}>{page.total}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className={styles.tableContainer}>
+      <div className={styles.tableWrapper}>
         {loading ? (
-          <div className={styles.loading}>Loading operational queue...</div>
+          <div className={styles.tableLoading}>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className={styles.skeletonRow}>
+                <div className={styles.skeleton} style={{ width: 100 }} />
+                <div className={styles.skeleton} style={{ width: 140 }} />
+                <div className={styles.skeleton} style={{ width: 80 }} />
+                <div className={styles.skeleton} style={{ width: 60 }} />
+                <div className={styles.skeleton} style={{ flex: 1 }} />
+                <div className={styles.skeleton} style={{ width: 80 }} />
+              </div>
+            ))}
+          </div>
         ) : !page || page.items.length === 0 ? (
-          <div className={styles.empty}>
-            {filter === "needs_you"
-              ? "Queue empty. No cases are waiting for your review."
-              : "No cases match these filters."}
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>
+              {filter === "needs_you" ? "✓" : "—"}
+            </div>
+            <div className={styles.emptyTitle}>
+              {filter === "needs_you" ? "Queue is clear" : "No cases match this filter"}
+            </div>
+            <div className={styles.emptySub}>
+              {filter === "needs_you"
+                ? "All exceptions have been reviewed or auto-resolved."
+                : "Try switching to a different tab."}
+            </div>
           </div>
         ) : (
           <table className={styles.table}>
@@ -148,53 +138,60 @@ function QueueContent() {
               <tr>
                 <th>CASE</th>
                 <th>CAUSE</th>
-                <th className={styles.rightAlign}>AT RISK</th>
-                <th className={styles.rightAlign}>CONFIDENCE</th>
+                <th className={styles.right}>EXPOSURE</th>
+                <th className={styles.right}>EVIDENCE</th>
                 <th>WHY</th>
                 <th>STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {page.items.map((item) => (
-                <tr key={item.exception_id} className={styles.row}>
+              {page.items.map(item => (
+                <tr
+                  key={item.exception_id}
+                  className={styles.row}
+                  onClick={() => router.push(`/exceptions/${item.exception_id}`)}
+                >
                   <td>
-                    <Link
-                      href={`/exceptions/${item.exception_id}`}
-                      className={styles.caseLink}
-                    >
-                      {item.exception_id.split("-")[1] || item.exception_id}
-                    </Link>
+                    <div className={styles.caseId}>{item.exception_id.replace("EX-", "")}</div>
+                    <div className={styles.paymentId}>{item.payment_id?.slice(0, 16)}</div>
                   </td>
-                  <td className={styles.causeCell}>
-                    {item.exception_type?.replace(/_/g, " ") || "UNKNOWN"}
+                  <td>
+                    <span className={styles.causeTag}>
+                      {item.exception_type?.replace(/_/g, " ") || "UNKNOWN"}
+                    </span>
                   </td>
-                  <td className={`${styles.rightAlign} ${styles.tabular} ${
-                    item.delta.paise < 0 ? styles.negative : styles.attention
-                  }`}>
-                    {item.delta.paise === 0 ? "₹0.00" : formatMoney(item.delta.paise)}
+                  <td className={`${styles.right} ${styles.exposureCell}`}>
+                    {item.delta.paise !== 0 ? (
+                      <span className={Math.abs(item.delta.paise) > 100000 ? styles.exposureLarge : styles.exposureNormal}>
+                        {fmt(item.delta.paise)}
+                      </span>
+                    ) : (
+                      <span className={styles.exposureZero}>₹0</span>
+                    )}
                   </td>
-                  <td className={`${styles.rightAlign} ${styles.tabular} ${styles.confCell}`}>
-                    {item.evidence_score === 0 ? "0 — System declined" : (item.evidence_score !== null ? item.evidence_score : "—")}
+                  <td className={`${styles.right} ${styles.evidenceCell}`}>
+                    {item.evidence_score === null ? (
+                      <span className={styles.evidenceNone}>—</span>
+                    ) : item.evidence_score === 0 ? (
+                      <span className={styles.evidenceLow}>0</span>
+                    ) : (
+                      <span className={styles.evidenceOk}>{item.evidence_score}</span>
+                    )}
                   </td>
-                  <td className={styles.whyCell}>
-                    {getWhyText(item.exception_type)}
-                  </td>
-                  <td className={styles.statusCell}>
-                    {getStatusNode(item.status)}
-                  </td>
-                  
-                  {/* Absolute overlay link to make entire row clickable without nesting <a> tags invalidly */}
-                  <td className={styles.rowLinkOverlay}>
-                    <Link href={`/exceptions/${item.exception_id}`} className={styles.hiddenLink} tabIndex={-1}>
-                      View
-                    </Link>
-                  </td>
+                  <td className={styles.whyCell}>{getWhyText(item.exception_type)}</td>
+                  <td><StatusBadge status={item.status} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {page && page.total > page.items.length && (
+        <div className={styles.paginationNote}>
+          Showing {page.items.length} of {page.total.toLocaleString()} — prioritized by financial exposure
+        </div>
+      )}
     </>
   );
 }
@@ -203,11 +200,13 @@ export default function QueuePage() {
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Exception Queue</h1>
-        <p className={styles.pageSubtitle}>Prioritized by financial exposure</p>
+        <div>
+          <h1 className={styles.pageTitle}>Exception Queue</h1>
+          <p className={styles.pageSubtitle}>Prioritized by financial exposure · Click any case to investigate</p>
+        </div>
       </div>
       <div className={styles.queueCard}>
-        <Suspense fallback={<div className={styles.loading}>Loading queue...</div>}>
+        <Suspense fallback={<div className={styles.suspenseFallback}>Loading queue...</div>}>
           <QueueContent />
         </Suspense>
       </div>

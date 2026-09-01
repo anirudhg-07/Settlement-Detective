@@ -1,56 +1,51 @@
 :root {
-  /* Canvas — not pure white; pure white behind dense tables is harsh */
-  --canvas:        #FAFAFB;
+  /* Canvas */
+  --canvas:        #F8F9FB;
   --surface:       #FFFFFF;
-  --surface-sunk:  #F4F5F7;   /* table headers, code blocks */
-  --border:        #E4E7EC;   /* 1px hairlines, not shadows */
-  --border-strong: #D0D5DD;
+  --surface-sunk:  #F1F3F7;
+  --surface-hover: #F5F7FA;
+  --border:        #E4E7EC;
+  --border-strong: #C9D0DA;
 
-  /* Ink — navy-black rather than true black; softer, more considered */
-  --ink:           #0F2A43;
-  --ink-secondary: #4A5A6B;
-  --ink-muted:     #8593A3;
+  /* Ink */
+  --ink:           #0D2137;
+  --ink-secondary: #445568;
+  --ink-muted:     #8596A8;
 
-  /* Brand — deep navy for chrome, one brighter blue for interaction.
-     Adjacent to payments-industry navy without imitating any one brand. */
-  --brand:         #14346B;
-  --brand-hover:   #0F2851;
+  /* Brand */
+  --brand:         #0F2547;
+  --brand-mid:     #1A3A6B;
+  --brand-hover:   #0B1D38;
   --interactive:   #2563EB;
   --interactive-bg:#EFF4FF;
+  --interactive-hover: #1D4ED8;
 
-  /* Semantics — one step darker than the usual palette defaults.
-     Serious, not alarm-clock. */
-  --negative:      #B42318;   /* money missing */
+  /* Semantics */
+  --negative:      #B42318;
   --negative-bg:   #FEF3F2;
-  --attention:     #B54708;   /* surplus, review, escalated */
+  --negative-border:#FCA5A5;
+  --attention:     #B54708;
   --attention-bg:  #FFFAEB;
-  --verified:      #067647;   /* verified, balanced, intact — never brand */
+  --attention-border:#FCD34D;
+  --verified:      #067647;
   --verified-bg:   #ECFDF3;
-  --neutral:       #475467;   /* pending, no action needed */
+  --verified-border:#6EE7B7;
+  --neutral:       #475467;
   --neutral-bg:    #F2F4F7;
 
-  --radius:        6px;       /* restrained; 16px+ reads consumer app */
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(13, 33, 55, 0.05);
+  --shadow-sm: 0 1px 3px rgba(13, 33, 55, 0.08), 0 1px 2px rgba(13, 33, 55, 0.06);
+  --shadow-md: 0 4px 6px rgba(13, 33, 55, 0.07), 0 2px 4px rgba(13, 33, 55, 0.06);
+  --shadow-lg: 0 10px 15px rgba(13, 33, 55, 0.08), 0 4px 6px rgba(13, 33, 55, 0.05);
+
+  /* Spacing */
+  --radius:        6px;
   --radius-lg:     8px;
+  --radius-xl:     12px;
 }
 
-/* Optional dark mode */
-:root[data-theme="dark"] {
-  --canvas:        #0B1220;
-  --surface:       #111A2B;
-  --surface-sunk:  #0D1524;
-  --border:        #1E2A3D;
-  --ink:           #E6EAF2;
-  --ink-secondary: #9AA8BC;
-  --ink-muted:     #6B7A90;
-  --interactive:   #6098FF;
-  --negative:      #F97066;
-  --attention:     #F79009;
-  --verified:      #47CD89;
-}
-
-html {
-  height: 100%;
-}
+html { height: 100%; }
 
 body {
   min-height: 100%;
@@ -58,30 +53,53 @@ body {
   flex-direction: column;
   color: var(--ink);
   background: var(--canvas);
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+* { box-sizing: border-box; padding: 0; margin: 0; }
+
+a { color: var(--interactive); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Global utility classes */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.mono { font-family: 'SF Mono', 'Roboto Mono', monospace; }
+
+/* Skeleton loading animation */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-a {
-  color: var(--interactive);
-  text-decoration: none;
+.skeleton {
+  background: var(--surface-sunk);
+  border-radius: var(--radius);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
-a:hover {
-  text-decoration: underline;
+/* Status badge base */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
+/* Subtle fade-in for page content */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.mono {
-  font-family: monospace;
+.page-enter {
+  animation: fadeIn 0.2s ease-out forwards;
 }
