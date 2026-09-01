@@ -96,7 +96,6 @@ export default function InvestigationView({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input
       if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "SELECT") return;
 
       if (e.key === "Escape") {
@@ -132,7 +131,6 @@ export default function InvestigationView({
     setShowRejectForm(false);
     setShowEscalateForm(false);
     
-    // Auto-advance to next case simulation
     setTimeout(() => {
       router.push('/queue');
     }, 1500);
@@ -147,6 +145,15 @@ export default function InvestigationView({
     return paise < 0 ? `−${formatted}` : `+${formatted}`;
   };
 
+  const getConclusionText = (type: string | null) => {
+    if (!type) return "Awaiting investigation.";
+    if (type.includes("MISSING_REFUND")) return "Refund was expected but never debited from payout.";
+    if (type.includes("MISSING_SETTLEMENT")) return "Payment captured but settlement never arrived.";
+    if (type.includes("FEE")) return "Charged fee differs from expected standard rate.";
+    if (type.includes("DUPLICATE")) return "Multiple settlement lines exist for one capture.";
+    return "Reconciliation engine flagged a discrepancy.";
+  };
+
   if (loading) return <div className={styles.loading}>Loading investigation record...</div>;
   if (error || !data) return (
     <div className={styles.errorState}>
@@ -156,12 +163,13 @@ export default function InvestigationView({
   );
 
   const { exception, investigation } = data;
-  
-  // Format string for claim
   const exceptionTypeDisplay = exception.exception_type?.replace(/_/g, " ") || "UNKNOWN EXCEPTION";
-  const claimText = investigation?.decision || "Awaiting human review. Discrepancy detected during standard reconciliation run.";
-
   const isUnexplained = investigation?.unexplained_amount && investigation.unexplained_amount.paise !== 0;
+
+  // Filter tool steps for the tool trail (hide pure LLM think steps unless it's the finding)
+  const toolSteps = investigation?.steps.filter(s => 
+    s.step_type === "tool_call" || s.step_type === "finding"
+  ) || [];
 
   return (
     <div className={styles.container}>
@@ -178,7 +186,7 @@ export default function InvestigationView({
           {formatMoney(Math.abs(exception.delta.paise))}
         </div>
         <div className={styles.exposureLabel}>FINANCIAL EXPOSURE</div>
-        <p className={styles.claimText}>{claimText}</p>
+        <p className={styles.claimText}>{getConclusionText(exception.exception_type)}</p>
       </div>
 
       <div className={styles.arithmeticSection}>
@@ -223,7 +231,7 @@ export default function InvestigationView({
       </div>
 
       <div className={styles.evidenceListSection}>
-        <h3 className={styles.sectionTitle}>EVIDENCE</h3>
+        <h3 className={styles.sectionTitle}>EVIDENCE RECORDS</h3>
         {!investigation?.evidence || investigation.evidence.length === 0 ? (
           <div className={styles.noEvidence}>No supporting evidence was found. Case requires escalation.</div>
         ) : (
@@ -235,7 +243,6 @@ export default function InvestigationView({
                   <div className={styles.evidenceDetails}>
                     <div className={styles.evidenceTitle}>{ev.record_type}</div>
                     <div className={styles.mono}>{ev.record_id}</div>
-                    {ev.note && <div className={styles.evidenceNote}>{ev.note}</div>}
                   </div>
                   <div className={styles.evidenceAmount}>
                     {ev.amount_contribution ? formatMoney(ev.amount_contribution.paise) : "₹0.00"}
@@ -248,75 +255,99 @@ export default function InvestigationView({
         )}
       </div>
 
+      {/* NEW AI INVESTIGATION SECTION */}
       {investigation && (
-        <div className={styles.trustSection}>
-          <div className={styles.trustBlock}>
-            <h3 className={styles.sectionTitle}>SYSTEM EVIDENCE SCORE</h3>
-            <div className={styles.scoreValue}>{investigation.evidence_score !== null ? investigation.evidence_score : "0"}</div>
-            
-            <div className={styles.scoreFactors}>
-              {investigation.score_factors?.map((factor, idx) => (
-                <div key={idx} className={styles.factorRow}>
-                  <span>{factor.name}</span>
-                  <span className={styles.factorDelta}>{factor.delta > 0 ? `+${factor.delta}` : factor.delta}</span>
-                </div>
-              ))}
-            </div>
+        <div className={styles.aiSection}>
+          <div className={styles.aiHeader}>
+            <h3 className={styles.aiTitle}>AI INVESTIGATION</h3>
           </div>
-          <div className={styles.trustBlock}>
-            <h3 className={styles.sectionTitle}>MODEL SELF-REPORTED CONFIDENCE</h3>
-            <div className={styles.confidenceValue}>
-              {investigation.reasoning_confidence !== null ? `${investigation.reasoning_confidence}%` : "—"}
-            </div>
-            <div className={styles.confidenceNote}>Model claimed {investigation.reasoning_confidence}% certainty. (Not proof of correctness).</div>
-          </div>
-        </div>
-      )}
-
-      {investigation?.steps && investigation.steps.length > 0 && (
-        <div className={styles.toolsSection}>
-          <button 
-            className={styles.toolsToggle} 
-            onClick={() => setToolsExpanded(!toolsExpanded)}
-          >
-            HOW IT INVESTIGATED {toolsExpanded ? "▴" : "▾"}
-          </button>
           
-          {toolsExpanded && (
-            <div className={styles.toolsList}>
-              {investigation.steps.map((step, idx) => (
-                <div key={idx} className={styles.toolItem}>
-                  <div className={styles.toolHeader}>
-                    <span className={styles.toolSeq}>{step.seq}.</span>
-                    <span className={styles.toolName}>{step.tool_name || step.step_type}</span>
-                    {step.duration_ms && <span className={styles.toolTime}>{step.duration_ms}ms</span>}
-                  </div>
-                  {step.tool_args && (
-                    <div className={styles.toolArgs}>
-                      {JSON.stringify(step.tool_args)}
-                    </div>
-                  )}
-                  {step.observation && (
-                    <div className={styles.toolObservation}>{step.observation}</div>
-                  )}
-                </div>
-              ))}
+          <div className={styles.aiBody}>
+            <div className={styles.aiBlock}>
+              <div className={styles.aiLabel}>Reasoning</div>
+              <div className={styles.aiReasoningText}>"{investigation.decision}"</div>
             </div>
-          )}
-        </div>
-      )}
 
-      <div className={styles.decisionSplit}>
-        <div className={styles.systemRec}>
-          <h3 className={styles.sectionTitle}>SYSTEM RECOMMENDATION</h3>
-          <div className={styles.recStatus}>
-            {investigation?.final_status === "RESOLVED" ? "✓ RESOLVE" : "↑ ESCALATE / REVIEW"}
+            <div className={styles.aiBlock}>
+              <div className={styles.aiLabel}>Evidence used</div>
+              {investigation.evidence.length > 0 ? (
+                <div className={styles.aiEvidenceList}>
+                  {investigation.evidence.map((ev, idx) => (
+                    <div key={idx} className={styles.aiEvidenceRow}>
+                      <span className={styles.aiCheck}>✓</span> {ev.record_type} <span className={styles.monoMuted}>{ev.record_id}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.aiEvidenceRowMuted}>None found.</div>
+              )}
+            </div>
+
+            <div className={styles.aiBlock}>
+              <button 
+                className={styles.toolsToggle} 
+                onClick={() => setToolsExpanded(!toolsExpanded)}
+              >
+                TOOL TRAIL {toolsExpanded ? "▴" : "▾"}
+              </button>
+              
+              {toolsExpanded && toolSteps.length > 0 && (
+                <div className={styles.toolsList}>
+                  {toolSteps.map((step, idx) => (
+                    <div key={idx} className={styles.toolItem}>
+                      <div className={styles.toolHeader}>
+                        <span className={styles.toolSeq}>{idx + 1}.</span>
+                        <span className={styles.toolName}>{step.tool_name || step.step_type}</span>
+                        {step.duration_ms !== null && <span className={styles.toolTime}>{step.duration_ms}ms</span>}
+                      </div>
+                      {step.tool_args && (
+                        <div className={styles.toolArgs}>
+                          args: {JSON.stringify(step.tool_args)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.aiScoresDivider} />
+            
+            <div className={styles.aiScoresSplit}>
+              <div className={styles.aiScoreCol}>
+                <div className={styles.aiLabel}>MODEL CONFIDENCE</div>
+                <div className={styles.aiScoreValue}>{investigation.reasoning_confidence ?? "—"}%</div>
+                <div className={styles.aiScoreSub}>Gemini's stated confidence</div>
+              </div>
+              
+              <div className={styles.aiScoreCol}>
+                <div className={styles.aiLabel}>EVIDENCE SCORE</div>
+                <div className={styles.aiScoreValueStrong}>{investigation.evidence_score ?? "0"}</div>
+                <div className={styles.aiScoreSub}>Verified evidence support</div>
+              </div>
+            </div>
+            
+            <div className={styles.aiWarning}>
+              High model confidence does not override insufficient evidence.
+            </div>
+            
+            <div className={styles.aiScoresDivider} />
+            
+            <div className={styles.aiDecisionBlock}>
+              <div className={styles.aiLabel}>FINAL DECISION</div>
+              <div className={`${styles.aiDecisionValue} ${
+                investigation.final_status === "RESOLVED" ? styles.decisionResolved : styles.decisionEscalated
+              }`}>
+                {investigation.final_status}
+              </div>
+            </div>
+
           </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.actionSection}>
-        <h3 className={styles.sectionTitle}>YOUR DECISION</h3>
+        <h3 className={styles.sectionTitle}>YOUR ACTION</h3>
         
         {actionState ? (
           <div className={styles.actionTaken}>
