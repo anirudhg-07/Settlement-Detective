@@ -232,7 +232,9 @@ export default function InvestigationView({
 
       <div className={styles.evidenceListSection}>
         <h3 className={styles.sectionTitle}>EVIDENCE RECORDS</h3>
-        {!investigation?.evidence || investigation.evidence.length === 0 ? (
+        {!investigation ? (
+          <div className={styles.noEvidence}>Investigation pending. Records will be gathered by the agent.</div>
+        ) : !investigation.evidence || investigation.evidence.length === 0 ? (
           <div className={styles.noEvidence}>No supporting evidence was found. Case requires escalation.</div>
         ) : (
           <div className={styles.evidenceList}>
@@ -256,12 +258,12 @@ export default function InvestigationView({
       </div>
 
       {/* NEW AI INVESTIGATION SECTION */}
-      {investigation && (
-        <div className={styles.aiSection}>
-          <div className={styles.aiHeader}>
-            <h3 className={styles.aiTitle}>AI INVESTIGATION</h3>
-          </div>
-          
+      <div className={styles.aiSection}>
+        <div className={styles.aiHeader}>
+          <h3 className={styles.aiTitle}>AI INVESTIGATION</h3>
+        </div>
+        
+        {investigation ? (
           <div className={styles.aiBody}>
             <div className={styles.aiBlock}>
               <div className={styles.aiLabel}>Reasoning</div>
@@ -341,10 +343,14 @@ export default function InvestigationView({
                 {investigation.final_status}
               </div>
             </div>
-
           </div>
-        </div>
-      )}
+        ) : (
+          <div className={styles.aiEmptyState}>
+            <p className={styles.aiEmptyStateTitle}>Investigation not yet available</p>
+            <p className={styles.aiEmptyStateDesc}>This exception has been detected but has not been investigated by the agent yet.</p>
+          </div>
+        )}
+      </div>
 
       <div className={styles.actionSection}>
         <h3 className={styles.sectionTitle}>YOUR ACTION</h3>
