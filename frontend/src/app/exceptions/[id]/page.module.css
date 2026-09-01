@@ -3,63 +3,86 @@
   flex-direction: column;
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   max-width: 900px;
   margin: 0 auto;
+  box-shadow: 0 1px 3px rgba(15, 42, 67, 0.05);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--border);
   background-color: var(--surface-sunk);
   font-size: 0.875rem;
 }
 
 .queueLink {
-  color: var(--interactive);
-  cursor: pointer;
+  color: var(--ink-secondary);
+  font-weight: 500;
+  transition: color 0.15s;
 }
 
 .queueLink:hover {
-  text-decoration: underline;
+  color: var(--ink);
+}
+
+.queueLinkDisabled {
+  color: var(--border-strong);
+  cursor: not-allowed;
 }
 
 .caseId {
   font-family: monospace;
-  font-weight: 500;
-  color: var(--ink-secondary);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.paymentId {
+  font-family: monospace;
+  color: var(--ink-muted);
 }
 
 .claimSection {
-  padding: 24px;
+  padding: 48px 32px;
   border-bottom: 1px solid var(--border);
-}
-
-.claimHeader {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  text-align: center;
 }
 
 .exceptionType {
-  font-size: 1.125rem;
+  font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--attention);
+  color: var(--ink-secondary);
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
 }
 
-.evidenceScore {
+.financialExposure {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--negative);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.exposureLabel {
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--negative);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 24px;
 }
 
 .claimText {
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: 1.125rem;
+  line-height: 1.6;
   color: var(--ink);
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .sectionTitle {
@@ -71,31 +94,48 @@
   margin-bottom: 16px;
 }
 
-.arithmeticSection, .evidenceListSection, .decisionSplit, .actionSection {
-  padding: 24px;
+.arithmeticSection {
+  padding: 32px;
   border-bottom: 1px solid var(--border);
 }
 
 .mathBlock {
-  font-family: monospace;
   font-size: 0.875rem;
   background-color: var(--surface-sunk);
-  padding: 16px;
+  padding: 24px;
   border-radius: var(--radius);
-  max-width: 500px;
+  max-width: 400px;
+  color: var(--ink);
 }
 
 .mathRow {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: 6px 0;
+  font-weight: 500;
 }
 
-.evidenceMathRow {
+.evidenceMathBlock {
+  padding: 8px 0;
+}
+
+.mathRowMuted {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0 4px 16px;
+  padding: 6px 0;
   color: var(--ink-secondary);
+}
+
+.mathRowStrong {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.attentionText {
+  color: var(--attention);
 }
 
 .divider {
@@ -112,23 +152,57 @@
   font-family: monospace;
 }
 
+.evidenceListSection {
+  padding: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
 .evidenceList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .evidenceItem {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background-color: var(--surface);
+}
+
+.evidenceMain {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.evidenceIcon {
+  color: var(--verified);
+  font-weight: 600;
+}
+
+.evidenceDetails {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.evidenceMain {
-  display: flex;
-  gap: 16px;
-  align-items: center;
+.evidenceTitle {
+  font-weight: 600;
   font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.evidenceNote {
+  font-size: 0.875rem;
+  color: var(--ink-secondary);
+}
+
+.evidenceAmount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .openRecordBtn {
@@ -137,54 +211,169 @@
   color: var(--interactive);
   cursor: pointer;
   font-size: 0.875rem;
+  font-weight: 500;
+  padding: 8px;
 }
 
 .openRecordBtn:hover {
   text-decoration: underline;
 }
 
-.evidenceNote {
+.noEvidence {
+  color: var(--attention);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.trustSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 32px;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface-sunk);
+}
+
+.trustBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.scoreValue {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.confidenceValue {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--ink-secondary);
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.scoreFactors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 0.75rem;
   color: var(--ink-secondary);
-  padding-left: 24px;
 }
 
-.systemRec {
-  background-color: var(--neutral-bg);
-  padding: 16px;
+.factorRow {
+  display: flex;
+  justify-content: space-between;
+}
+
+.factorDelta {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.confidenceNote {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.toolsSection {
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolsToggle {
+  width: 100%;
+  text-align: left;
+  padding: 24px 32px;
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.toolsToggle:hover {
+  background-color: var(--surface-sunk);
+}
+
+.toolsList {
+  padding: 0 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolItem {
+  font-family: monospace;
+  font-size: 0.75rem;
+  background-color: var(--surface-sunk);
+  padding: 12px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
 }
 
-.recStatus {
+.toolHeader {
+  display: flex;
+  gap: 8px;
+  color: var(--ink);
   font-weight: 600;
   margin-bottom: 8px;
 }
 
-.recReason {
-  font-size: 0.875rem;
-  margin-bottom: 12px;
+.toolTime {
+  color: var(--ink-muted);
+  margin-left: auto;
 }
 
-.modelConf {
-  font-size: 0.75rem;
+.toolArgs {
   color: var(--ink-secondary);
+  margin-bottom: 8px;
+}
+
+.toolObservation {
+  color: var(--verified);
+}
+
+.decisionSplit {
+  padding: 32px;
+  text-align: center;
+}
+
+.recStatus {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.actionSection {
+  padding: 32px;
+  background-color: var(--surface-sunk);
+  text-align: center;
+  border-top: 1px solid var(--border);
 }
 
 .actionButtons {
   display: flex;
+  justify-content: center;
   gap: 16px;
   align-items: center;
 }
 
 .actionBtn {
-  padding: 8px 16px;
+  padding: 12px 24px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background-color: var(--surface);
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.1s ease;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .btnAccept {
@@ -208,86 +397,149 @@
 .keyboardHint {
   font-size: 0.75rem;
   color: var(--ink-muted);
+  margin-left: 16px;
+}
+
+.actionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.reasonSelect {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.actionFormButtons {
+  display: flex;
+  gap: 16px;
+}
+
+.cancelBtn {
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--ink-secondary);
 }
 
 .actionTaken {
   color: var(--verified);
   font-weight: 600;
+  font-size: 1.125rem;
 }
 .timestamp {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--ink-muted);
   font-weight: normal;
-  margin-left: 8px;
+  display: block;
+  margin-top: 8px;
 }
 
+/* Evidence Slide-over */
 .evidenceOverlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(11, 18, 32, 0.4);
   display: flex;
   justify-content: flex-end;
   z-index: 100;
+  backdrop-filter: blur(2px);
 }
 
 .evidencePanel {
-  width: 400px;
+  width: 480px;
   background-color: var(--surface);
   height: 100%;
-  box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
+  animation: slideIn 0.2s ease-out forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 .panelHeader {
-  padding: 16px 24px;
+  padding: 24px 32px;
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--surface-sunk);
+}
+
+.panelTitle {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .closeBtn {
   background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 6px 12px;
   cursor: pointer;
   font-size: 0.75rem;
+  font-weight: 500;
   color: var(--ink-secondary);
+  transition: all 0.15s;
 }
 .closeBtn:hover {
-  background-color: var(--surface-sunk);
+  background-color: var(--surface);
+  color: var(--ink);
 }
 
 .panelBody {
-  padding: 24px;
+  padding: 32px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  font-size: 0.875rem;
+  gap: 24px;
 }
 
-.rawRecordPlaceholder {
-  margin-top: 24px;
-  background-color: var(--surface-sunk);
-  padding: 16px;
-  border-radius: var(--radius);
-  font-family: monospace;
-  font-size: 0.75rem;
+.panelField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
   color: var(--ink-muted);
-  white-space: pre-wrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fieldValue {
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.fieldValueVerified {
+  font-size: 0.875rem;
+  color: var(--verified);
+  font-weight: 500;
 }
 
 .loading {
-  padding: 48px;
+  padding: 64px;
   text-align: center;
   color: var(--ink-muted);
 }
 .errorState {
-  padding: 48px;
+  padding: 64px;
   text-align: center;
   color: var(--negative);
 }

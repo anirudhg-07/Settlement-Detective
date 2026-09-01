@@ -4,34 +4,46 @@
   gap: 24px;
 }
 
-.header {
-  padding: 16px 24px;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
-.headerTitle {
-  font-weight: 500;
+.pageTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
   color: var(--ink);
 }
 
-.heroSection {
-  display: flex;
-  justify-content: center;
+.pageSubtitle {
+  font-size: 0.875rem;
+  font-family: monospace;
+  color: var(--ink-secondary);
 }
 
-.heroCard {
+.smokeTestAlert {
+  background-color: var(--attention-bg);
+  border: 1px solid var(--attention);
+  color: var(--attention);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.primaryMetricCard {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 32px 48px;
+  border-radius: var(--radius-lg);
+  padding: 48px;
   text-align: center;
-  width: 100%;
-  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.heroTitle {
+.primaryLabel {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--ink-secondary);
@@ -40,73 +52,72 @@
   margin-bottom: 16px;
 }
 
-.heroValue {
-  font-size: 3rem;
+.primaryValue {
+  font-size: 4rem;
   font-weight: 700;
-  color: var(--attention);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 8px;
+  line-height: 1;
+  margin-bottom: 12px;
 }
 
-.heroSubtext {
+.primarySub {
   font-size: 0.875rem;
   color: var(--ink-muted);
 }
 
-.grid {
+.metricsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 24px;
 }
 
-.card {
+.metricGroup {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
-.cardTitle {
-  font-size: 0.875rem;
+.groupTitle {
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--ink-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 
 .statRow {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 1rem;
+  padding: 6px 0;
+  font-size: 0.875rem;
+  color: var(--ink);
 }
 
-.statValue {
-  font-weight: 600;
+.tabular {
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
-.statSubtext {
-  font-size: 0.75rem;
-  color: var(--ink-muted);
-  border-top: 1px dashed var(--border-strong);
-  padding-top: 8px;
-  margin-top: auto;
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
-.splitSection {
+.chartCard {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 24px;
+  display: flex;
+  flex-direction: column;
 }
 
-.sectionTitle {
-  font-size: 0.875rem;
+.chartTitle {
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--ink-secondary);
   text-transform: uppercase;
@@ -114,47 +125,129 @@
   margin-bottom: 24px;
 }
 
-.splitGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.barChart {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
-.splitCard {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  text-align: center;
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.splitStatus {
+.barLabel {
+  width: 130px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barTrack {
+  flex: 1;
+  height: 8px;
+  background-color: var(--surface-sunk);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background-color: var(--ink);
+  border-radius: 4px;
+}
+
+.barFillAttention { background-color: var(--attention); }
+.barFillVerified { background-color: var(--verified); }
+.barFillNegative { background-color: var(--negative); }
+
+.barValue {
+  width: 60px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--ink-secondary);
-  margin-bottom: 8px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
 }
 
-.splitCount {
-  font-size: 1.5rem;
+.moneyValue {
+  width: 90px;
+}
+
+.emptyChart {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.qualityComparison {
+  background-color: var(--surface-sunk);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qualityRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.qualityLabel {
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.qualityValue {
+  font-size: 1.125rem;
   font-weight: 600;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-.note {
+.qualityDivider {
+  border-bottom: 1px dashed var(--border-strong);
+  margin: 4px 0;
+}
+
+.qualityLabelAttention {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--attention);
+}
+
+.qualityValueAttention {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--attention);
+  font-variant-numeric: tabular-nums;
+}
+
+.qualityNote {
   font-size: 0.75rem;
   color: var(--ink-muted);
-  text-align: center;
-  margin-top: 16px;
+  line-height: 1.5;
 }
 
-.loading {
-  padding: 48px;
+.loading, .empty {
+  padding: 64px;
   text-align: center;
   color: var(--ink-muted);
 }
 
-.error {
-  padding: 48px;
-  text-align: center;
-  color: var(--negative);
+@media (max-width: 768px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
 }

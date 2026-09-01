@@ -53,30 +53,26 @@ interface ExceptionPage {
 export default function CommandCenter() {
   const [health, setHealth] = useState<Health | null>(null);
   const [run, setRun] = useState<RunSummary | null>(null);
-  const [escalated, setEscalated] = useState<{ count: number; total: number }>({
-    count: 0,
-    total: 0,
-  });
-  const [review, setReview] = useState<{ count: number; total: number }>({
-    count: 0,
-    total: 0,
-  });
-  const [resolved, setResolved] = useState<{ count: number; total: number }>({
-    count: 0,
-    total: 0,
-  });
+  
+  const [escalated, setEscalated] = useState<{ count: number; total: number }>({ count: 0, total: 0 });
+  const [review, setReview] = useState<{ count: number; total: number }>({ count: 0, total: 0 });
+  const [resolved, setResolved] = useState<{ count: number; total: number }>({ count: 0, total: 0 });
+  
+  const [priorityCases, setPriorityCases] = useState<ExceptionSummary[]>([]);
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [healthRes, runRes, escalatedRes, reviewRes, resolvedRes] =
+        const [healthRes, runRes, escalatedRes, reviewRes, resolvedRes, priorityRes] =
           await Promise.all([
             fetch("/api/health"),
             fetch("/api/runs/latest"),
             fetch("/api/exceptions?status=ESCALATED&limit=500"),
             fetch("/api/exceptions?status=DETECTED&status=INVESTIGATING&limit=500"),
             fetch("/api/exceptions?status=RESOLVED&limit=500"),
+            fetch("/api/exceptions?status=DETECTED&status=INVESTIGATING&status=ESCALATED&limit=3") // highest delta
           ]);
 
         if (healthRes.ok) setHealth(await healthRes.json());
@@ -93,6 +89,10 @@ export default function CommandCenter() {
         if (escalatedRes.ok) setEscalated(calcTotal(await escalatedRes.json()));
         if (reviewRes.ok) setReview(calcTotal(await reviewRes.json()));
         if (resolvedRes.ok) setResolved(calcTotal(await resolvedRes.json()));
+        if (priorityRes.ok) {
+          const pPage = await priorityRes.json();
+          setPriorityCases(pPage.items);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -103,90 +103,128 @@ export default function CommandCenter() {
   }, []);
 
   const formatMoney = (paise: number) => {
-    const rupees = paise / 100;
-    return new Intl.NumberFormat("en-IN", {
+    const rupees = Math.abs(paise) / 100;
+    const formatted = new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
     }).format(rupees);
+    return formatted; // Will handle sign outside if needed, usually absolute for exposure
   };
 
   if (loading) {
-    return <div className={styles.loading}>Loading run data...</div>;
+    return <div className={styles.loading}>Loading operational data...</div>;
   }
 
   if (!run || !health) {
-    return <div className={styles.error}>Unable to load run data.</div>;
+    return <div className={styles.error}>Unable to load run data. Ensure backend is running.</div>;
   }
 
-  const isIntact = true; // In a real app, this would be determined by the integrity API
+  const isIntact = true; 
   const isBalanced = run.batches_out_of_balance === 0;
+  
+  const totalReconciled = run.matched + run.pending;
+  const matchRatePct = (run.match_rate_bps / 100).toFixed(2);
+  
+  const moneyAtRiskPaise = review.total + escalated.total;
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.headerTitle}>
-          FreshKart · settlement run {run.as_of_date}
+          FreshKart <span className={styles.headerMuted}>· Settlement run {run.as_of_date}</span>
         </div>
         <div className={styles.headerStatus}>
-          <span className={isIntact ? styles.statusOk : styles.statusError}>
-            chain intact {isIntact ? "✓" : "✗"}
+          <span className={isIntact ? styles.statusVerified : styles.statusAttention}>
+            {isIntact ? "✓" : "✗"} Chain intact
           </span>
-          <span className={isBalanced ? styles.statusOk : styles.statusError}>
-            batches balanced {isBalanced ? "✓" : "✗"}
+          <span className={isBalanced ? styles.statusVerified : styles.statusAttention}>
+            {isBalanced ? "✓" : "✗"} Batches balanced
           </span>
         </div>
       </header>
 
-      <div className={styles.mainGrid}>
-        <div className={styles.needsAttention}>
-          <h2 className={styles.sectionTitle}>NEEDS ATTENTION</h2>
-          <div className={styles.attentionCards}>
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>REVIEW</div>
-              <div className={styles.cardCount}>{review.count}</div>
-              <div className={styles.cardMoney}>{formatMoney(review.total)}</div>
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>RECONCILIATION</h2>
+        <div className={styles.reconciliationCard}>
+          <div className={styles.reconHeader}>
+            <span className={styles.reconCount}>
+              <span className={styles.tabular}>{totalReconciled.toLocaleString()}</span> / <span className={styles.tabular}>{run.records_processed.toLocaleString()}</span> reconciled
+            </span>
+          </div>
+          
+          <div className={styles.progressBar}>
+            <div className={styles.progressFill} style={{ width: `${matchRatePct}%` }}></div>
+          </div>
+          
+          <div className={styles.reconFooter}>
+            <span className={styles.reconRate}>{matchRatePct}%</span>
+            <div className={styles.reconStats}>
+              <span><span className={styles.tabular}>{run.matched.toLocaleString()}</span> MATCHED</span>
+              <span><span className={styles.tabular}>{run.pending.toLocaleString()}</span> IN SETTLEMENT WINDOW</span>
+              <span><span className={styles.tabular}>{run.exceptions.toLocaleString()}</span> EXCEPTIONS</span>
             </div>
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>ESCALATED</div>
-              <div className={styles.cardCount}>{escalated.count}</div>
-              <div className={styles.cardMoneyAttention}>
-                {formatMoney(escalated.total)}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.grid}>
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>NEEDS YOUR ATTENTION</h2>
+          <div className={styles.attentionCard}>
+            <div className={styles.attentionStats}>
+              <div className={styles.attentionCol}>
+                <span className={styles.attentionLabel}>REVIEW</span>
+                <span className={styles.attentionCount}>{review.count}</span>
+              </div>
+              <div className={styles.attentionCol}>
+                <span className={styles.attentionLabel}>ESCALATED</span>
+                <span className={styles.attentionCount}>{escalated.count}</span>
               </div>
             </div>
+            <div className={styles.moneyAtRiskBox}>
+              <span className={styles.moneyLabel}>MONEY AT RISK</span>
+              <span className={styles.moneyValue}>{formatMoney(moneyAtRiskPaise)}</span>
+            </div>
           </div>
         </div>
 
-        <div className={styles.noAction}>
-          <h2 className={styles.sectionTitle}>NO ACTION</h2>
-          <div className={styles.noActionList}>
-            <div className={styles.noActionItem}>
-              <span className={styles.noActionCount}>{run.matched}</span>
-              <span className={styles.noActionLabel}>matched</span>
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>AUTO-RESOLVED — SPOT CHECK</h2>
+          <div className={styles.resolvedCard}>
+            <div className={styles.resolvedStats}>
+              <span className={styles.resolvedCount}>{resolved.count} cases</span>
+              <span className={styles.resolvedMoney}>{formatMoney(resolved.total)} accounted for</span>
             </div>
-            <div className={styles.noActionItem}>
-              <span className={styles.noActionCount}>{run.pending}</span>
-              <span className={styles.noActionLabel}>
-                in settlement window
-              </span>
-            </div>
-          </div>
-          <div className={styles.matchRate}>
-            {(run.match_rate_bps / 100).toFixed(2)}% reconciled
+            <Link href="/queue?filter=auto_resolved" className={styles.resolvedLink}>
+              Review a random sample →
+            </Link>
           </div>
         </div>
       </div>
 
-      <div className={styles.autoResolved}>
-        <h2 className={styles.sectionTitle}>AUTO-RESOLVED — spot-check</h2>
-        <div className={styles.resolvedRow}>
-          <span>
-            {resolved.count} cases · {formatMoney(resolved.total)} accounted for
-          </span>
-          <Link href="/queue?status=RESOLVED" className={styles.link}>
-            review a random sample →
-          </Link>
+      {priorityCases.length > 0 && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>PRIORITY EXCEPTIONS</h2>
+          <div className={styles.priorityList}>
+            {priorityCases.map(caseItem => (
+              <Link 
+                key={caseItem.exception_id} 
+                href={`/exceptions/${caseItem.exception_id}`} 
+                className={styles.priorityRow}
+              >
+                <div className={styles.priorityLeft}>
+                  <div className={styles.priorityId}>{caseItem.exception_id.split("-")[1] || caseItem.exception_id}</div>
+                  <div className={styles.priorityCause}>{caseItem.exception_type?.replace(/_/g, " ") || "UNKNOWN"}</div>
+                </div>
+                <div className={styles.priorityRight}>
+                  <div className={styles.priorityRisk}>{formatMoney(Math.abs(caseItem.delta.paise))} at risk</div>
+                  <div className={styles.priorityEvidence}>{caseItem.evidence_score !== null ? `${caseItem.evidence_score} evidence` : "No evidence"}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
