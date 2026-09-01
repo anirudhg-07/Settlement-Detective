@@ -1,21 +1,44 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
+}
+
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pageTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pageSubtitle {
+  font-size: 0.875rem;
+  color: var(--ink-secondary);
+}
+
+.queueCard {
+  display: flex;
+  flex-direction: column;
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
 .header {
   border-bottom: 1px solid var(--border);
-  padding: 0 16px;
+  padding: 0 24px;
+  background-color: var(--surface-sunk);
 }
 
 .tabs {
   display: flex;
-  gap: 24px;
+  gap: 32px;
 }
 
 .tab {
@@ -27,6 +50,7 @@
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .tab:hover {
@@ -40,6 +64,7 @@
 
 .tableContainer {
   padding: 0;
+  overflow-x: auto;
 }
 
 .table {
@@ -52,31 +77,61 @@
 .table th {
   padding: 12px 24px;
   color: var(--ink-muted);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   border-bottom: 1px solid var(--border);
-  background-color: var(--surface-sunk);
 }
 
 .table td {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
+  position: relative;
+  vertical-align: middle;
+}
+
+.row {
+  position: relative;
+  transition: background-color 0.15s ease;
 }
 
 .row:hover {
   background-color: var(--surface-sunk);
 }
 
+/* Make entire row clickable trick */
+.rowLinkOverlay {
+  padding: 0 !important;
+  border: none !important;
+  width: 0;
+}
+
+.hiddenLink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  z-index: 1;
+}
+
 .caseLink {
-  color: var(--interactive);
-  font-weight: 500;
+  color: var(--ink);
+  font-weight: 600;
   font-family: monospace;
+  position: relative;
+  z-index: 2; /* keep above hidden link so we can right-click open it */
 }
 
 .caseLink:hover {
   text-decoration: underline;
+}
+
+.causeCell {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .rightAlign {
@@ -85,6 +140,12 @@
 
 .tabular {
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.confCell {
+  color: var(--ink-secondary);
+  font-weight: 500;
 }
 
 .negative {
@@ -95,19 +156,49 @@
   color: var(--attention);
 }
 
-.statusCell {
+.whyCell {
   color: var(--ink-secondary);
-  font-size: 0.75rem;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.loading {
-  padding: 48px;
-  text-align: center;
-  color: var(--ink-muted);
+.statusCell {
+  white-space: nowrap;
 }
 
-.empty {
-  padding: 48px;
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statusVerified {
+  background-color: var(--verified-bg);
+  color: var(--verified);
+}
+
+.statusAttention {
+  background-color: var(--attention-bg);
+  color: var(--attention);
+}
+
+.statusNegative {
+  background-color: var(--negative-bg);
+  color: var(--negative);
+}
+
+.statusNeutral {
+  background-color: var(--neutral-bg);
+  color: var(--neutral);
+}
+
+.loading, .empty {
+  padding: 64px;
   text-align: center;
   color: var(--ink-muted);
 }
