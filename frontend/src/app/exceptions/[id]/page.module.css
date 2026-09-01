@@ -1,0 +1,301 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface-sunk);
+  font-size: 0.875rem;
+}
+
+.queueLink {
+  color: var(--interactive);
+  cursor: pointer;
+}
+
+.queueLink:hover {
+  text-decoration: underline;
+}
+
+.caseId {
+  font-family: monospace;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.claimSection {
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.claimHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.exceptionType {
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--attention);
+}
+
+.evidenceScore {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.claimText {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+}
+
+.arithmeticSection, .evidenceListSection, .decisionSplit, .actionSection {
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mathBlock {
+  font-family: monospace;
+  font-size: 0.875rem;
+  background-color: var(--surface-sunk);
+  padding: 16px;
+  border-radius: var(--radius);
+  max-width: 500px;
+}
+
+.mathRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.evidenceMathRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0 4px 16px;
+  color: var(--ink-secondary);
+}
+
+.divider {
+  border-bottom: 1px dashed var(--border-strong);
+  margin: 8px 0;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+.evidenceList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evidenceItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evidenceMain {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.openRecordBtn {
+  background: none;
+  border: none;
+  color: var(--interactive);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.openRecordBtn:hover {
+  text-decoration: underline;
+}
+
+.evidenceNote {
+  font-size: 0.75rem;
+  color: var(--ink-secondary);
+  padding-left: 24px;
+}
+
+.systemRec {
+  background-color: var(--neutral-bg);
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.recStatus {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.recReason {
+  font-size: 0.875rem;
+  margin-bottom: 12px;
+}
+
+.modelConf {
+  font-size: 0.75rem;
+  color: var(--ink-secondary);
+}
+
+.actionButtons {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.actionBtn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.1s ease;
+}
+
+.btnAccept {
+  color: var(--verified);
+  border-color: var(--verified);
+}
+.btnAccept:hover { background-color: var(--verified-bg); }
+
+.btnReject {
+  color: var(--negative);
+  border-color: var(--negative);
+}
+.btnReject:hover { background-color: var(--negative-bg); }
+
+.btnEscalate {
+  color: var(--attention);
+  border-color: var(--attention);
+}
+.btnEscalate:hover { background-color: var(--attention-bg); }
+
+.keyboardHint {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.actionTaken {
+  color: var(--verified);
+  font-weight: 600;
+}
+.timestamp {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+.evidenceOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 100;
+}
+
+.evidencePanel {
+  width: 400px;
+  background-color: var(--surface);
+  height: 100%;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.closeBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--ink-secondary);
+}
+.closeBtn:hover {
+  background-color: var(--surface-sunk);
+}
+
+.panelBody {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+
+.rawRecordPlaceholder {
+  margin-top: 24px;
+  background-color: var(--surface-sunk);
+  padding: 16px;
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+.errorState {
+  padding: 48px;
+  text-align: center;
+  color: var(--negative);
+}
+.retryBtn {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}

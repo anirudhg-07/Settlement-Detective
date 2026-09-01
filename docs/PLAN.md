@@ -21,9 +21,9 @@ Working checklist for the build. Six of sixteen phases done.
 | 8 | Evidence builder | ✅ done | 200 |
 | 9 | Confidence / safety layer | ✅ done | 223 |
 | 10 | Audit trail | ✅ done | 239 |
-| 11 | Razorpay Test Mode integration | ✅ done | **257** |
-| 12 | Backend APIs | ⬅️ **next** | |
-| 13 | Frontend dashboard | pending | |
+| 11 | Razorpay Test Mode integration | ✅ done | 257 |
+| 12 | Backend APIs | ✅ done | **278** |
+| 13 | Frontend dashboard | ⬅️ **next** | |
 | 14 | Evaluation | pending | |
 | 15 | Stress testing | pending | |
 | 16 | Demo / polish / documentation | pending | |
@@ -359,21 +359,45 @@ test payments. Both endpoints authenticate and return HTTP 200 with zero items;
 a deliberately wrong secret returns 401, proving the 200s are real. The
 synthetic dataset remains the evaluation environment (§26).
 
-# Phase 12 — Backend APIs
+# ✅ Phase 12 — Backend APIs
 
-FastAPI over the existing modules. Roughly:
+**Built:** `backend/api/` (app, deps, schemas, 4 routers), `scripts/serve.py`,
+21 tests. FastAPI + uvicorn added to requirements.
 
 ```
-GET  /api/runs/latest          Command Centre totals
-GET  /api/exceptions           filter by status / type / value / confidence
-GET  /api/exceptions/{id}      detail + evidence + timeline
-POST /api/exceptions/{id}/investigate
-GET  /api/metrics              the evaluation numbers
+GET  /api/health                              dataset + latest run
+GET  /api/runs  ·  /api/runs/latest           Command Centre totals
+GET  /api/exceptions                          queue: filters + pagination
+GET  /api/exceptions/{id}                     detail + timeline + evidence + integrity
+POST /api/exceptions/{id}/investigate         run the agent on one case
+GET  /api/metrics                             evaluation aggregates
 ```
 
-Read-only for financial records. The frontend never gets a secret.
+Interactive docs at `/docs`; 7 documented paths in the OpenAPI contract.
 
----
+**The API owns no financial logic.** Every number it serves was produced by the
+engine, classifier, investigator or audit trail and is read back, not
+recomputed.
+
+**Three lines held:**
+
+- **Ground truth is aggregates-only.** `/api/metrics` reads `gt` through the
+  `sd_eval` role to produce counts. No route returns a per-case answer key — a
+  test asserts `case_truth`, `is_exception` and `injection_params` never appear
+  in any response body. Publishing one would make every accuracy figure
+  meaningless, because the agent could read it.
+- **Exactly one non-GET route exists**, asserted by test. The API is an
+  investigation surface, not a way to edit money.
+- **The agent gets no wider access over HTTP.** `POST /investigate` runs it on
+  the same least-privilege connection the CLI uses, and the case status is
+  still written back by the owner — the agent does not close its own ticket.
+
+**Quota-safe by default:** an already-investigated case returns the stored
+result unless `force=true`, so a dashboard refresh cannot spend API quota or
+contradict the audit trail.
+
+Money crosses the wire as `{paise, display}` — never a float, which would
+reintroduce at the last step exactly the rounding problem the model avoids.
 
 # Phase 13 — Frontend dashboard
 
