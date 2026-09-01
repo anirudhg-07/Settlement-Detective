@@ -152,7 +152,12 @@ function QueueContent() {
                   onClick={() => router.push(`/exceptions/${item.exception_id}`)}
                 >
                   <td>
-                    <div className={styles.caseId}>{item.exception_id.replace("EX-", "")}</div>
+                    <div className={styles.caseId}>
+                      {item.exception_id.replace("EX-", "")}
+                      {item.evidence_score !== null && (
+                        <span className={styles.geminiBadge} title="Investigated by Gemini">✦</span>
+                      )}
+                    </div>
                     <div className={styles.paymentId}>{item.payment_id?.slice(0, 16)}</div>
                   </td>
                   <td>

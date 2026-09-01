@@ -246,7 +246,7 @@ export default function InvestigationView({ params }: { params: Promise<{ id: st
       <div className={`${styles.panel} ${styles.aiPanel}`}>
         <div className={styles.aiPanelHeader}>
           <div className={styles.panelLabel}>GEMINI AI INVESTIGATION</div>
-          <div className={styles.aiPanelBadge}>AI-assisted</div>
+          <div className={styles.aiPanelBadge}>✦ Powered by Gemini</div>
         </div>
 
         {!investigation ? (
@@ -331,7 +331,7 @@ export default function InvestigationView({ params }: { params: Promise<{ id: st
                 <div className={`${styles.scoreValue} ${(investigation.evidence_score || 0) === 0 ? styles.scoreValueLow : ""}`}>
                   {investigation.evidence_score ?? 0}
                 </div>
-                <div className={styles.scoreSub}>Verified evidence support</div>
+                <div className={styles.scoreSub}>Deterministic evidence support</div>
               </div>
             </div>
 

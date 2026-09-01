@@ -160,7 +160,7 @@ export default function CommandCenter() {
       {/* Reconciliation Overview */}
       <div className={styles.reconCard}>
         <div className={styles.reconCardHeader}>
-          <div className={styles.reconCardTitle}>Reconciliation Overview</div>
+          <div className={styles.reconCardTitle}>Deterministic Reconciliation</div>
           <div className={styles.reconCardRate}>{matchRatePct.toFixed(2)}% reconciled</div>
         </div>
 

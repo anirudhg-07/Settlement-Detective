@@ -151,6 +151,14 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.geminiBadge {
+  color: var(--interactive);
+  font-size: 0.75rem;
 }
 
 .paymentId {

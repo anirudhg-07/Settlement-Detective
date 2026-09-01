@@ -86,19 +86,19 @@ export default function AnalyticsPage() {
     {
       label: "Precision",
       value: `${(metrics.detection.precision_bps / 100).toFixed(2)}%`,
-      desc: "Of exceptions flagged, how many were genuine exceptions.",
+      desc: `Of exceptions flagged, how many were genuine exceptions.${isSmokeTest ? ` Based on ${totalInv} investigations.` : ""}`,
       color: "verified",
     },
     {
       label: "Recall",
       value: `${(metrics.detection.recall_bps / 100).toFixed(2)}%`,
-      desc: "Of all true exceptions, how many were correctly detected.",
+      desc: `Of all true exceptions, how many were correctly detected.${isSmokeTest ? ` Based on ${totalInv} investigations.` : ""}`,
       color: "verified",
     },
     {
       label: "Classification Accuracy",
       value: `${(metrics.classification.accuracy_bps / 100).toFixed(2)}%`,
-      desc: "How often the exception type was correctly categorized.",
+      desc: `How often the exception type was correctly categorized.${isSmokeTest ? ` Based on ${totalInv} investigations.` : ""}`,
       color: "verified",
     },
     {
@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
     {
       label: "Reconciliation Rate",
       value: `${(metrics.reconciled_bps / 100).toFixed(2)}%`,
-      desc: "Share of payments reconciled (matched or in settlement window).",
+      desc: "Share of payments deterministically reconciled.",
       color: "neutral",
     },
     {
