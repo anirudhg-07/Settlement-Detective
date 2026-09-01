@@ -21,8 +21,9 @@ investigates **why** — and escalates what it cannot safely explain.
 | 8 | Evidence builder | ✅ done |
 | 9 | Confidence / safety layer | ✅ done |
 | 10 | Audit trail | ✅ done |
-| 11 | Razorpay Test Mode | next |
-| 12–16 | APIs → UI → evaluation → demo | pending |
+| 11 | Razorpay Test Mode | ✅ done |
+| 12 | Backend APIs | next |
+| 13–16 | UI → evaluation → stress → demo | pending |
 
 ## Quick start
 
@@ -105,6 +106,7 @@ backend/
     evidence.py            what each record can actually support
     scoring.py             the evidence score — code decides, not the model
   audit/trail.py           hash-chained trail + reconstruction
+  razorpay/                Test Mode client + mapping (verified endpoints only)
   models/                  ops / recon / gt schemas
   db/session.py            one engine per database role
 alembic/versions/          0001 schemas · 0002 tables · 0003 roles + grants
@@ -115,6 +117,7 @@ scripts/generate_data.py   generate, verify, then load the dataset
 scripts/reconcile.py       run the engine, score it against ground truth
 scripts/investigate.py     run the AI agent (checkpointed, cached, budgeted)
 scripts/audit.py           reconstruct an investigation; verify trail integrity
+scripts/razorpay_sync.py   read Razorpay Test Mode; cross-check our arithmetic
 ```
 
 ## Documentation

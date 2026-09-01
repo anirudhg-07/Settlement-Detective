@@ -20,10 +20,10 @@ Working checklist for the build. Six of sixteen phases done.
 | 7 | AI investigation agent | ✅ done | 186 |
 | 8 | Evidence builder | ✅ done | 200 |
 | 9 | Confidence / safety layer | ✅ done | 223 |
-| 10 | Audit trail | ✅ done | **239** |
-| 11 | Razorpay Test Mode integration | ⬅️ **next** | |
-| 12 | Backend APIs | pending | |
-| 13 | Frontend dashboard | pending | |
+| 10 | Audit trail | ✅ done | 239 |
+| 11 | Razorpay Test Mode integration | ✅ done | 257 |
+| 12 | Backend APIs | ✅ done | **278** |
+| 13 | Frontend dashboard | ⬅️ **next** | |
 | 14 | Evaluation | pending | |
 | 15 | Stress testing | pending | |
 | 16 | Demo / polish / documentation | pending | |
@@ -318,37 +318,86 @@ calls, records examined, evidence, score derivation, integrity check. That
 output is Screens 3 and 4 in text form, so the frontend has a defined contract
 to render rather than a shape to invent.
 
-# Phase 11 — Razorpay Test Mode
+# ✅ Phase 11 — Razorpay Test Mode
 
-**Needs:** `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` (Test Mode only).
+**Built:** `backend/razorpay/{client,mapping}.py`, `scripts/razorpay_sync.py`,
+18 tests.
 
-**Non-negotiable:** check the current official docs first. Never invent an
-endpoint, parameter, or response field. If test mode does not provide enough
-data, say so plainly and keep the synthetic dataset as the evaluation
-environment.
-
-Also verify the fee schedule (2% / 1.9% / 0%) and the T+2 cycle — currently
-**synthetic defaults, not asserted Razorpay pricing**.
-
-All secret-key calls stay server-side.
-
----
-
-# Phase 12 — Backend APIs
-
-FastAPI over the existing modules. Roughly:
+**Three endpoints, each read from the live docs before it was written**
+(verified 2026-08-29):
 
 ```
-GET  /api/runs/latest          Command Centre totals
-GET  /api/exceptions           filter by status / type / value / confidence
-GET  /api/exceptions/{id}      detail + evidence + timeline
-POST /api/exceptions/{id}/investigate
-GET  /api/metrics              the evaluation numbers
+GET /v1/settlements                  list batches
+GET /v1/settlements/{id}             one batch
+GET /v1/settlements/recon/combined   the line items (year, month required)
 ```
 
-Read-only for financial records. The frontend never gets a secret.
+A test asserts no fourth path exists in the client — §43 enforced mechanically.
 
----
+**The model matched reality before it was checked.** Three Phase 1 decisions
+turned out to be exactly what the API does:
+
+| Our choice | Razorpay |
+|---|---|
+| Integer paise | amounts in "currency subunits" |
+| Batch + line items, not one row per payment | that *is* the recon report |
+| Status `created` / `processed` / `failed` | the same three values |
+
+**A bug caught by reading rather than assuming.** `credit` in the recon report
+is **already net** (`amount − fee − tax`: documented example 100000 − 2900 − 0 =
+97100). The first mapper treated it as gross and deducted fees a second time —
+which would have taken the fee twice off every settled payment. This is exactly
+what §43 exists to prevent.
+
+**Cross-validation:** Razorpay states the net it credited; our
+`payment_item_net` run over the gross and deductions lands on the same figure.
+Asserted against their documented example.
+
+**Test Mode returns no settlements — and that is correct.** Settlements are
+created when money actually moves to a bank account, which does not happen for
+test payments. Both endpoints authenticate and return HTTP 200 with zero items;
+a deliberately wrong secret returns 401, proving the 200s are real. The
+synthetic dataset remains the evaluation environment (§26).
+
+# ✅ Phase 12 — Backend APIs
+
+**Built:** `backend/api/` (app, deps, schemas, 4 routers), `scripts/serve.py`,
+21 tests. FastAPI + uvicorn added to requirements.
+
+```
+GET  /api/health                              dataset + latest run
+GET  /api/runs  ·  /api/runs/latest           Command Centre totals
+GET  /api/exceptions                          queue: filters + pagination
+GET  /api/exceptions/{id}                     detail + timeline + evidence + integrity
+POST /api/exceptions/{id}/investigate         run the agent on one case
+GET  /api/metrics                             evaluation aggregates
+```
+
+Interactive docs at `/docs`; 7 documented paths in the OpenAPI contract.
+
+**The API owns no financial logic.** Every number it serves was produced by the
+engine, classifier, investigator or audit trail and is read back, not
+recomputed.
+
+**Three lines held:**
+
+- **Ground truth is aggregates-only.** `/api/metrics` reads `gt` through the
+  `sd_eval` role to produce counts. No route returns a per-case answer key — a
+  test asserts `case_truth`, `is_exception` and `injection_params` never appear
+  in any response body. Publishing one would make every accuracy figure
+  meaningless, because the agent could read it.
+- **Exactly one non-GET route exists**, asserted by test. The API is an
+  investigation surface, not a way to edit money.
+- **The agent gets no wider access over HTTP.** `POST /investigate` runs it on
+  the same least-privilege connection the CLI uses, and the case status is
+  still written back by the owner — the agent does not close its own ticket.
+
+**Quota-safe by default:** an already-investigated case returns the stored
+result unless `force=true`, so a dashboard refresh cannot spend API quota or
+contradict the audit trail.
+
+Money crosses the wire as `{paise, display}` — never a float, which would
+reintroduce at the last step exactly the rounding problem the model avoids.
 
 # Phase 13 — Frontend dashboard
 
