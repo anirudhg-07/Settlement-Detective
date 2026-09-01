@@ -236,6 +236,20 @@
   padding-bottom: 8px;
 }
 
+.aiEmptyState {
+  padding: 24px 0;
+  color: var(--ink-muted);
+}
+.aiEmptyStateTitle {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.aiEmptyStateDesc {
+  font-size: 0.875rem;
+}
+
 .aiBody {
   display: flex;
   flex-direction: column;
