@@ -260,7 +260,7 @@ export default function InvestigationView({
       {/* NEW AI INVESTIGATION SECTION */}
       <div className={styles.aiSection}>
         <div className={styles.aiHeader}>
-          <h3 className={styles.aiTitle}>AI INVESTIGATION</h3>
+          <h3 className={styles.aiTitle}>GEMINI AI INVESTIGATION</h3>
         </div>
         
         {investigation ? (
@@ -336,12 +336,25 @@ export default function InvestigationView({
             <div className={styles.aiScoresDivider} />
             
             <div className={styles.aiDecisionBlock}>
-              <div className={styles.aiLabel}>FINAL DECISION</div>
+              <div className={styles.aiLabel}>SYSTEM FINAL DECISION</div>
               <div className={`${styles.aiDecisionValue} ${
                 investigation.final_status === "RESOLVED" ? styles.decisionResolved : styles.decisionEscalated
               }`}>
-                {investigation.final_status}
+                {investigation.final_status} {investigation.final_status === "ESCALATED" && investigation.evidence_score === 0 ? "— insufficient verified evidence" : ""}
               </div>
+              {investigation.score_factors && investigation.score_factors.length > 0 && (
+                <div className={styles.rationaleBlock}>
+                  <div className={styles.rationaleTitle}>Decision Rationale:</div>
+                  <ul className={styles.rationaleList}>
+                    {investigation.score_factors.map((sf, idx) => (
+                      <li key={idx} className={styles.rationaleItem}>
+                        <span className={styles.rationaleDetail}>{sf.detail}</span>
+                        <span className={styles.rationaleBadge}>Evidence score {sf.delta > 0 ? `+${sf.delta}` : sf.delta}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         ) : (

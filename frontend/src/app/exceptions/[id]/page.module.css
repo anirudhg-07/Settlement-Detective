@@ -256,6 +256,49 @@
   gap: 24px;
 }
 
+.rationaleBlock {
+  margin-top: 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.rationaleTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.rationaleList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rationaleItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+.rationaleDetail {
+  flex: 1;
+}
+.rationaleBadge {
+  font-family: monospace;
+  font-size: 0.75rem;
+  background-color: var(--surface-sunk);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
 .aiBlock {
   display: flex;
   flex-direction: column;
