@@ -24,7 +24,6 @@
   font-weight: 500;
   transition: color 0.15s;
 }
-
 .queueLink:hover {
   color: var(--ink);
 }
@@ -39,7 +38,6 @@
   font-weight: 600;
   color: var(--ink);
 }
-
 .paymentId {
   font-family: monospace;
   color: var(--ink-muted);
@@ -79,7 +77,7 @@
 
 .claimText {
   font-size: 1.125rem;
-  line-height: 1.6;
+  font-weight: 500;
   color: var(--ink);
   max-width: 600px;
   margin: 0 auto;
@@ -148,9 +146,8 @@
   text-align: right;
 }
 
-.mono {
-  font-family: monospace;
-}
+.mono { font-family: monospace; }
+.monoMuted { font-family: monospace; color: var(--ink-muted); }
 
 .evidenceListSection {
   padding: 32px;
@@ -194,11 +191,6 @@
   color: var(--ink);
 }
 
-.evidenceNote {
-  font-size: 0.875rem;
-  color: var(--ink-secondary);
-}
-
 .evidenceAmount {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -214,106 +206,120 @@
   font-weight: 500;
   padding: 8px;
 }
-
 .openRecordBtn:hover {
   text-decoration: underline;
 }
-
 .noEvidence {
   color: var(--attention);
   font-weight: 500;
   font-size: 0.875rem;
 }
 
-.trustSection {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+/* AI INVESTIGATION SECTION */
+.aiSection {
   padding: 32px;
   border-bottom: 1px solid var(--border);
   background-color: var(--surface-sunk);
 }
 
-.trustBlock {
-  display: flex;
-  flex-direction: column;
+.aiHeader {
+  margin-bottom: 24px;
 }
 
-.scoreValue {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1;
-  margin-bottom: 16px;
-}
-
-.confidenceValue {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--ink-secondary);
-  line-height: 1;
-  margin-bottom: 16px;
-}
-
-.scoreFactors {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.aiTitle {
   font-size: 0.75rem;
-  color: var(--ink-secondary);
-}
-
-.factorRow {
-  display: flex;
-  justify-content: space-between;
-}
-
-.factorDelta {
   font-weight: 600;
   color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 8px;
 }
 
-.confidenceNote {
-  font-size: 0.875rem;
-  color: var(--ink-muted);
-  line-height: 1.5;
+.aiBody {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.toolsSection {
-  padding: 0;
-  border-bottom: 1px solid var(--border);
+.aiBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.toolsToggle {
-  width: 100%;
-  text-align: left;
-  padding: 24px 32px;
-  background: none;
-  border: none;
+.aiLabel {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--ink-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  cursor: pointer;
 }
 
+.aiReasoningText {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: var(--radius);
+  font-style: italic;
+}
+
+.aiEvidenceList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aiEvidenceRow {
+  font-size: 0.875rem;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aiEvidenceRowMuted {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+.aiCheck {
+  color: var(--verified);
+  font-weight: bold;
+}
+
+/* Tool Trail */
+.toolsToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--interactive);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  display: inline-block;
+  width: max-content;
+}
 .toolsToggle:hover {
-  background-color: var(--surface-sunk);
+  text-decoration: underline;
 }
 
 .toolsList {
-  padding: 0 32px 32px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .toolItem {
   font-family: monospace;
   font-size: 0.75rem;
-  background-color: var(--surface-sunk);
-  padding: 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
   border-radius: var(--radius);
 }
 
@@ -322,39 +328,73 @@
   gap: 8px;
   color: var(--ink);
   font-weight: 600;
-  margin-bottom: 8px;
+}
+.toolSeq { color: var(--ink-muted); }
+.toolTime { margin-left: auto; color: var(--ink-muted); }
+.toolArgs { margin-top: 4px; color: var(--ink-secondary); word-break: break-all; }
+
+/* AI Trust Scores Comparison */
+.aiScoresDivider {
+  border-top: 1px dashed var(--border-strong);
+  margin: 8px 0;
 }
 
-.toolTime {
+.aiScoresSplit {
+  display: flex;
+  gap: 48px;
+}
+
+.aiScoreCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aiScoreValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink-secondary); /* Less prominent than evidence score */
+}
+
+.aiScoreValueStrong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink); /* Stronger */
+}
+
+.aiScoreSub {
+  font-size: 0.75rem;
   color: var(--ink-muted);
-  margin-left: auto;
 }
 
-.toolArgs {
-  color: var(--ink-secondary);
-  margin-bottom: 8px;
+.aiWarning {
+  font-size: 0.75rem;
+  color: var(--attention);
+  font-weight: 500;
+  background-color: var(--attention-bg);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--attention);
+  display: inline-block;
 }
 
-.toolObservation {
-  color: var(--verified);
+.aiDecisionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.decisionSplit {
-  padding: 32px;
-  text-align: center;
-}
-
-.recStatus {
+.aiDecisionValue {
   font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--ink);
+  font-weight: 700;
 }
+.decisionResolved { color: var(--verified); }
+.decisionEscalated { color: var(--attention); }
 
+/* Action section */
 .actionSection {
   padding: 32px;
-  background-color: var(--surface-sunk);
   text-align: center;
-  border-top: 1px solid var(--border);
 }
 
 .actionButtons {
@@ -376,22 +416,13 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.btnAccept {
-  color: var(--verified);
-  border-color: var(--verified);
-}
+.btnAccept { color: var(--verified); border-color: var(--verified); }
 .btnAccept:hover { background-color: var(--verified-bg); }
 
-.btnReject {
-  color: var(--negative);
-  border-color: var(--negative);
-}
+.btnReject { color: var(--negative); border-color: var(--negative); }
 .btnReject:hover { background-color: var(--negative-bg); }
 
-.btnEscalate {
-  color: var(--attention);
-  border-color: var(--attention);
-}
+.btnEscalate { color: var(--attention); border-color: var(--attention); }
 .btnEscalate:hover { background-color: var(--attention-bg); }
 
 .keyboardHint {
@@ -550,4 +581,11 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .aiScoresSplit {
+    flex-direction: column;
+    gap: 24px;
+  }
 }
