@@ -7,24 +7,11 @@ interface MetricsData {
   run_id: string;
   records_processed: number;
   reconciled_bps: number;
-  detection: {
-    precision_bps: number;
-    recall_bps: number;
-  };
-  classification: {
-    scoreable: number;
-    correct: number;
-    incorrect: number;
-    accuracy_bps: number;
-  };
-  investigation: {
-    investigated: number;
-    mean_evidence_score: number;
-    mean_confidence_overclaim: number;
-  };
+  detection: { precision_bps: number; recall_bps: number; };
+  classification: { scoreable: number; correct: number; incorrect: number; accuracy_bps: number; };
+  investigation: { investigated: number; mean_evidence_score: number; mean_confidence_overclaim: number; };
 }
 
-// Exception data for aggregation charts
 interface ExceptionSummary {
   exception_id: string;
   exception_type: string | null;
@@ -32,11 +19,7 @@ interface ExceptionSummary {
   delta: { paise: number };
 }
 
-interface CauseAggregate {
-  name: string;
-  count: number;
-  moneyAtRisk: number;
-}
+interface CauseAgg { name: string; count: number; moneyAtRisk: number; }
 
 export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
@@ -44,272 +27,223 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadData() {
+    async function load() {
       try {
-        const [metricsRes, exceptionsRes] = await Promise.all([
+        const [mRes, eRes] = await Promise.all([
           fetch("/api/metrics"),
-          fetch("/api/exceptions?limit=1000") // Load up to 1000 for realistic analytics
+          fetch("/api/exceptions?limit=1000"),
         ]);
-        
-        if (metricsRes.ok) setMetrics(await metricsRes.json());
-        if (exceptionsRes.ok) {
-          const json = await exceptionsRes.json();
-          setExceptions(json.items || []);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+        if (mRes.ok) setMetrics(await mRes.json());
+        if (eRes.ok) setExceptions((await eRes.json()).items || []);
+      } catch {}
+      finally { setLoading(false); }
     }
-    loadData();
+    load();
   }, []);
 
-  if (loading) {
-    return <div className={styles.loading}>Loading analytics data...</div>;
-  }
+  const fmt = (paise: number) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.abs(paise) / 100);
 
-  if (!metrics) {
-    return <div className={styles.empty}>Metrics unavailable. Run evaluations first.</div>;
-  }
+  if (loading) return (
+    <div className={styles.loadingWrap}>
+      {[1,2,3,4].map(i => <div key={i} className={styles.skeleton} style={{ height: 100 }} />)}
+    </div>
+  );
 
-  const formatMoney = (paise: number) => {
-    const rupees = Math.abs(paise) / 100;
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0
-    }).format(rupees);
-  };
+  if (!metrics) return (
+    <div className={styles.emptyFull}>
+      <div className={styles.emptyIcon}>—</div>
+      <div className={styles.emptyTitle}>Metrics unavailable</div>
+      <div className={styles.emptySub}>Run the evaluation pipeline first to see analytics.</div>
+    </div>
+  );
 
-  const totalEvaluations = metrics.investigation.investigated || 0;
-  const isSmokeTest = totalEvaluations < 50;
-  
-  // Note: Backend currently doesn't provide false_resolutions, we use 0 for the smoke test
-  const falseResolutionsCount = 0; 
-  const falseResolutionRate = totalEvaluations > 0 ? (falseResolutionsCount / totalEvaluations) * 100 : 0;
+  const totalInv = metrics.investigation.investigated || 0;
+  const isSmokeTest = totalInv < 50;
 
-  // Aggregate exceptions by cause
-  const causesMap = new Map<string, CauseAggregate>();
-  let totalExceptions = 0;
-  let maxCauseCount = 0;
-  let maxCauseMoney = 0;
+  // Aggregate exceptions
+  const causesMap = new Map<string, CauseAgg>();
+  let cntResolved = 0, cntEscalated = 0, cntRejected = 0;
 
-  let countResolved = 0;
-  let countEscalated = 0;
-  let countRejected = 0;
-  
   exceptions.forEach(ex => {
-    // Outcomes
-    if (ex.status === "RESOLVED") countResolved++;
-    if (ex.status === "ESCALATED") countEscalated++;
-    if (ex.status === "REJECTED") countRejected++;
-
-    // Causes
+    if (ex.status === "RESOLVED") cntResolved++;
+    if (ex.status === "ESCALATED") cntEscalated++;
+    if (ex.status === "REJECTED") cntRejected++;
     const name = ex.exception_type?.replace(/_/g, " ") || "UNKNOWN";
     const amt = Math.abs(ex.delta.paise);
-    
-    totalExceptions++;
-    
-    if (!causesMap.has(name)) {
-      causesMap.set(name, { name, count: 0, moneyAtRisk: 0 });
-    }
-    const curr = causesMap.get(name)!;
-    curr.count++;
-    curr.moneyAtRisk += amt;
+    if (!causesMap.has(name)) causesMap.set(name, { name, count: 0, moneyAtRisk: 0 });
+    const c = causesMap.get(name)!;
+    c.count++; c.moneyAtRisk += amt;
   });
 
   const causes = Array.from(causesMap.values()).sort((a, b) => b.count - a.count);
   const causesByMoney = [...causes].sort((a, b) => b.moneyAtRisk - a.moneyAtRisk);
+  const maxCount = causes[0]?.count || 1;
+  const maxMoney = causesByMoney[0]?.moneyAtRisk || 1;
+  const maxOutcome = Math.max(cntResolved, cntEscalated, cntRejected, 1);
 
-  if (causes.length > 0) {
-    maxCauseCount = causes[0].count;
-    maxCauseMoney = causesByMoney[0].moneyAtRisk;
-  }
-
-  const totalOutcomes = countResolved + countEscalated + countRejected;
-  const maxOutcome = Math.max(countResolved, countEscalated, countRejected);
+  const kpis = [
+    {
+      label: "Precision",
+      value: `${(metrics.detection.precision_bps / 100).toFixed(2)}%`,
+      desc: "Of exceptions flagged, how many were genuine exceptions.",
+      color: "verified",
+    },
+    {
+      label: "Recall",
+      value: `${(metrics.detection.recall_bps / 100).toFixed(2)}%`,
+      desc: "Of all true exceptions, how many were correctly detected.",
+      color: "verified",
+    },
+    {
+      label: "Classification Accuracy",
+      value: `${(metrics.classification.accuracy_bps / 100).toFixed(2)}%`,
+      desc: "How often the exception type was correctly categorized.",
+      color: "verified",
+    },
+    {
+      label: "Records Processed",
+      value: metrics.records_processed.toLocaleString(),
+      desc: "Total payment records in the settlement dataset.",
+      color: "neutral",
+    },
+    {
+      label: "Reconciliation Rate",
+      value: `${(metrics.reconciled_bps / 100).toFixed(2)}%`,
+      desc: "Share of payments reconciled (matched or in settlement window).",
+      color: "neutral",
+    },
+    {
+      label: "AI Investigations",
+      value: totalInv.toString(),
+      desc: `Cases investigated by Gemini.${isSmokeTest ? " Smoke test — not representative." : ""}`,
+      color: isSmokeTest ? "attention" : "neutral",
+    },
+  ];
 
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>System Analytics</h1>
-        <p className={styles.pageSubtitle}>
-          {metrics.run_id}
-        </p>
+        <div>
+          <h1 className={styles.pageTitle}>System Analytics</h1>
+          <div className={styles.pageSubtitle}>{metrics.run_id}</div>
+        </div>
       </div>
 
       {isSmokeTest && (
-        <div className={styles.smokeTestAlert}>
-          <strong>SMOKE TEST</strong> — Only {totalEvaluations} investigations evaluated. Metrics are directional only.
+        <div className={styles.smokeTestBanner}>
+          <strong>⚠ SMOKE TEST DATA</strong> — Only {totalInv} investigation{totalInv !== 1 ? "s" : ""} completed.
+          These metrics are directional only and do not represent the full 10,055-record dataset.
         </div>
       )}
 
-      {/* FALSE RESOLUTION RATE (PRIMARY METRIC) */}
-      <div className={styles.primaryMetricCard}>
-        <div className={styles.primaryLabel}>FALSE RESOLUTION RATE</div>
-        <div className={styles.primaryValue}>
-          {falseResolutionRate.toFixed(2)}%
-        </div>
-        <div className={styles.primarySub}>
-          ({falseResolutionsCount}/{totalEvaluations}) incorrect AI resolution recommendations
-        </div>
+      {/* KPI Grid */}
+      <div className={styles.kpiGrid}>
+        {kpis.map(k => (
+          <div key={k.label} className={`${styles.kpiCard} ${styles[`kpi_${k.color}`]}`}>
+            <div className={styles.kpiLabel}>{k.label}</div>
+            <div className={styles.kpiValue}>{k.value}</div>
+            <div className={styles.kpiDesc}>{k.desc}</div>
+          </div>
+        ))}
       </div>
 
-      {/* CORE METRICS GRID */}
-      <div className={styles.metricsGrid}>
-        <div className={styles.metricGroup}>
-          <h3 className={styles.groupTitle}>Detection</h3>
-          <div className={styles.statRow}>
-            <span>Precision</span>
-            <span className={styles.tabular}>{(metrics.detection.precision_bps / 100).toFixed(2)}%</span>
-          </div>
-          <div className={styles.statRow}>
-            <span>Recall</span>
-            <span className={styles.tabular}>{(metrics.detection.recall_bps / 100).toFixed(2)}%</span>
-          </div>
-        </div>
-        <div className={styles.metricGroup}>
-          <h3 className={styles.groupTitle}>Classification</h3>
-          <div className={styles.statRow}>
-            <span>Accuracy</span>
-            <span className={styles.tabular}>{(metrics.classification.accuracy_bps / 100).toFixed(2)}%</span>
-          </div>
-          <div className={styles.statRow}>
-            <span>Correct</span>
-            <span className={styles.tabular}>{metrics.classification.correct}</span>
-          </div>
-          <div className={styles.statRow}>
-            <span>Incorrect</span>
-            <span className={styles.tabular}>{metrics.classification.incorrect}</span>
-          </div>
-        </div>
-        <div className={styles.metricGroup}>
-          <h3 className={styles.groupTitle}>Performance</h3>
-          <div className={styles.statRow}>
-            <span>Processed</span>
-            <span className={styles.tabular}>{metrics.records_processed.toLocaleString()}</span>
-          </div>
-          <div className={styles.statRow}>
-            <span>Reconciled</span>
-            <span className={styles.tabular}>{(metrics.reconciled_bps / 100).toFixed(2)}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* CHARTS SECTION */}
-      <div className={styles.chartsGrid}>
-        {/* EXCEPTIONS BY CAUSE */}
+      {/* Charts */}
+      <div className={styles.chartsRow}>
+        {/* Exceptions by Cause */}
         <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>EXCEPTIONS BY CAUSE</h3>
-          <div className={styles.barChart}>
+          <div className={styles.chartTitle}>Exceptions by Cause</div>
+          <div className={styles.barList}>
             {causes.length === 0 ? (
-              <div className={styles.emptyChart}>No exceptions detected.</div>
-            ) : (
-              causes.map(c => (
-                <div key={c.name} className={styles.barRow}>
-                  <div className={styles.barLabel}>{c.name}</div>
-                  <div className={styles.barTrack}>
-                    <div 
-                      className={styles.barFill} 
-                      style={{ width: `${(c.count / maxCauseCount) * 100}%` }}
-                    />
-                  </div>
-                  <div className={styles.barValue}>{c.count}</div>
+              <div className={styles.chartEmpty}>No exceptions detected in this dataset.</div>
+            ) : causes.map(c => (
+              <div key={c.name} className={styles.barRow}>
+                <div className={styles.barLabelLeft}>{c.name}</div>
+                <div className={styles.barTrack}>
+                  <div className={styles.barFill} style={{ width: `${(c.count / maxCount) * 100}%` }} />
                 </div>
-              ))
-            )}
+                <div className={styles.barVal}>{c.count}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* MONEY AT RISK BY CAUSE */}
+        {/* Money at Risk */}
         <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>MONEY AT RISK BY CAUSE</h3>
-          <div className={styles.barChart}>
-            {causesByMoney.length === 0 || maxCauseMoney === 0 ? (
-              <div className={styles.emptyChart}>₹0.00 unresolved exposure.</div>
-            ) : (
-              causesByMoney.map(c => (
-                <div key={c.name} className={styles.barRow}>
-                  <div className={styles.barLabel}>{c.name}</div>
-                  <div className={styles.barTrack}>
-                    <div 
-                      className={`${styles.barFill} ${styles.barFillAttention}`} 
-                      style={{ width: `${(c.moneyAtRisk / maxCauseMoney) * 100}%` }}
-                    />
-                  </div>
-                  <div className={`${styles.barValue} ${styles.moneyValue}`}>
-                    {formatMoney(c.moneyAtRisk)}
-                  </div>
+          <div className={styles.chartTitle}>Money at Risk by Cause</div>
+          <div className={styles.barList}>
+            {causesByMoney.length === 0 || maxMoney === 0 ? (
+              <div className={styles.chartEmpty}>No financial exposure detected.</div>
+            ) : causesByMoney.map(c => (
+              <div key={c.name} className={styles.barRow}>
+                <div className={styles.barLabelLeft}>{c.name}</div>
+                <div className={styles.barTrack}>
+                  <div className={`${styles.barFill} ${styles.barFillRisk}`} style={{ width: `${(c.moneyAtRisk / maxMoney) * 100}%` }} />
                 </div>
-              ))
-            )}
+                <div className={`${styles.barVal} ${styles.barValMoney}`}>{fmt(c.moneyAtRisk)}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className={styles.chartsGrid}>
-        {/* INVESTIGATION OUTCOMES */}
+      <div className={styles.chartsRow}>
+        {/* Investigation Outcomes */}
         <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>INVESTIGATION OUTCOMES</h3>
-          <div className={styles.barChart}>
-            {totalOutcomes === 0 ? (
-              <div className={styles.emptyChart}>No actions taken yet.</div>
-            ) : (
-              <>
-                <div className={styles.barRow}>
-                  <div className={styles.barLabel}>RESOLVED</div>
-                  <div className={styles.barTrack}>
-                    <div className={`${styles.barFill} ${styles.barFillVerified}`} style={{ width: `${(countResolved / maxOutcome) * 100}%` }} />
-                  </div>
-                  <div className={styles.barValue}>{countResolved}</div>
+          <div className={styles.chartTitle}>Investigation Outcomes</div>
+          {cntResolved + cntEscalated + cntRejected === 0 ? (
+            <div className={styles.chartEmpty}>No actions taken yet. Investigate exceptions to record outcomes.</div>
+          ) : (
+            <div className={styles.barList}>
+              <div className={styles.barRow}>
+                <div className={styles.barLabelLeft}>Resolved</div>
+                <div className={styles.barTrack}>
+                  <div className={`${styles.barFill} ${styles.barFillVerified}`} style={{ width: `${(cntResolved / maxOutcome) * 100}%` }} />
                 </div>
-                <div className={styles.barRow}>
-                  <div className={styles.barLabel}>ESCALATED</div>
-                  <div className={styles.barTrack}>
-                    <div className={`${styles.barFill} ${styles.barFillAttention}`} style={{ width: `${(countEscalated / maxOutcome) * 100}%` }} />
-                  </div>
-                  <div className={styles.barValue}>{countEscalated}</div>
+                <div className={styles.barVal}>{cntResolved}</div>
+              </div>
+              <div className={styles.barRow}>
+                <div className={styles.barLabelLeft}>Escalated</div>
+                <div className={styles.barTrack}>
+                  <div className={`${styles.barFill} ${styles.barFillAttention}`} style={{ width: `${(cntEscalated / maxOutcome) * 100}%` }} />
                 </div>
-                <div className={styles.barRow}>
-                  <div className={styles.barLabel}>REJECTED</div>
-                  <div className={styles.barTrack}>
-                    <div className={`${styles.barFill} ${styles.barFillNegative}`} style={{ width: `${(countRejected / maxOutcome) * 100}%` }} />
-                  </div>
-                  <div className={styles.barValue}>{countRejected}</div>
+                <div className={styles.barVal}>{cntEscalated}</div>
+              </div>
+              <div className={styles.barRow}>
+                <div className={styles.barLabelLeft}>Rejected</div>
+                <div className={styles.barTrack}>
+                  <div className={`${styles.barFill} ${styles.barFillNegative}`} style={{ width: `${(cntRejected / maxOutcome) * 100}%` }} />
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* EVIDENCE QUALITY */}
-        <div className={styles.chartCard}>
-          <h3 className={styles.chartTitle}>EVIDENCE QUALITY</h3>
-          <div className={styles.qualityComparison}>
-            <div className={styles.qualityRow}>
-              <div className={styles.qualityLabel}>Evidence sufficiency</div>
-              <div className={styles.qualityValue}>{metrics.investigation.mean_evidence_score.toFixed(1)}</div>
-            </div>
-            <div className={styles.qualityRow}>
-              <div className={styles.qualityLabel}>Model self-confidence</div>
-              <div className={styles.qualityValue}>100.0</div>
-            </div>
-            <div className={styles.qualityDivider} />
-            <div className={styles.qualityRow}>
-              <div className={styles.qualityLabelAttention}>Confidence overclaim</div>
-              <div className={styles.qualityValueAttention}>
-                {metrics.investigation.mean_confidence_overclaim.toFixed(1)} pts
+                <div className={styles.barVal}>{cntRejected}</div>
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Evidence Quality */}
+        <div className={styles.chartCard}>
+          <div className={styles.chartTitle}>Evidence vs Confidence</div>
+          <div className={styles.scoreCompare}>
+            <div className={styles.scoreBox}>
+              <div className={styles.scoreBoxLabel}>MEAN EVIDENCE SCORE</div>
+              <div className={`${styles.scoreBoxVal} ${metrics.investigation.mean_evidence_score < 50 ? styles.scoreBoxValLow : styles.scoreBoxValOk}`}>
+                {metrics.investigation.mean_evidence_score.toFixed(1)}
+              </div>
+              <div className={styles.scoreBoxDesc}>Average verified evidence strength across investigated cases.</div>
+            </div>
+            <div className={styles.scoreBox}>
+              <div className={styles.scoreBoxLabel}>MEAN CONFIDENCE OVERCLAIM</div>
+              <div className={`${styles.scoreBoxVal} ${metrics.investigation.mean_confidence_overclaim > 0 ? styles.scoreBoxValAttention : styles.scoreBoxValOk}`}>
+                {metrics.investigation.mean_confidence_overclaim.toFixed(1)} pts
+              </div>
+              <div className={styles.scoreBoxDesc}>Model claimed confidence above what evidence actually supported.</div>
+            </div>
           </div>
-          <p className={styles.qualityNote}>
-            Model confidence is rarely proof. 
-            The system relies on actual retrieved evidence scores.
-          </p>
+          <div className={styles.scoreNote}>
+            High model confidence does not guarantee sufficient evidence. These metrics measure the gap between Gemini's stated confidence and the system's deterministic evidence evaluation.
+          </div>
         </div>
       </div>
-
     </div>
   );
 }

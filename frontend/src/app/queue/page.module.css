@@ -1,204 +1,320 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  animation: fadeIn 0.2s ease-out;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Page Header ──────────────────────────────────────── */
 .pageHeader {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
 .pageTitle {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
+  letter-spacing: -0.01em;
 }
 
 .pageSubtitle {
-  font-size: 0.875rem;
-  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin-top: 3px;
 }
 
+/* ── Queue Card ───────────────────────────────────────── */
 .queueCard {
-  display: flex;
-  flex-direction: column;
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
-.header {
+/* ── Toolbar ──────────────────────────────────────────── */
+.toolbar {
+  padding: 0 20px;
   border-bottom: 1px solid var(--border);
-  padding: 0 24px;
   background-color: var(--surface-sunk);
+  display: flex;
+  align-items: center;
 }
 
 .tabs {
   display: flex;
-  gap: 32px;
+  gap: 0;
 }
 
 .tab {
-  padding: 16px 0;
-  background: none;
+  padding: 13px 16px;
   border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--ink-secondary);
-  font-weight: 500;
-  font-size: 0.875rem;
+  background: none;
   cursor: pointer;
-  transition: all 0.15s ease;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  bottom: -1px;
+  white-space: nowrap;
 }
 
-.tab:hover {
-  color: var(--ink);
-}
+.tab:hover { color: var(--ink); }
 
 .tabActive {
   color: var(--ink);
-  border-bottom-color: var(--brand);
+  font-weight: 600;
+  border-bottom-color: var(--interactive);
 }
 
-.tableContainer {
-  padding: 0;
-  overflow-x: auto;
+.tabDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
 }
+
+.dotAttention { background-color: var(--attention); }
+.dotVerified  { background-color: var(--verified); }
+
+.tabCount {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Table ────────────────────────────────────────────── */
+.tableWrapper { overflow-x: auto; }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  text-align: left;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
-.table th {
-  padding: 12px 24px;
-  color: var(--ink-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.6875rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.table td {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  vertical-align: middle;
-}
-
-.row {
-  position: relative;
-  transition: background-color 0.15s ease;
-}
-
-.row:hover {
+.table thead tr {
   background-color: var(--surface-sunk);
 }
 
-/* Make entire row clickable trick */
-.rowLinkOverlay {
-  padding: 0 !important;
-  border: none !important;
-  width: 0;
+.table th {
+  padding: 10px 20px;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
 }
 
-.hiddenLink {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  opacity: 0;
-  z-index: 1;
-}
+.right { text-align: right; }
 
-.caseLink {
-  color: var(--ink);
-  font-weight: 600;
-  font-family: monospace;
+.table tbody tr { border-bottom: 1px solid var(--border); }
+.table tbody tr:last-child { border-bottom: none; }
+
+.row {
+  cursor: pointer;
+  transition: background-color 0.1s;
   position: relative;
-  z-index: 2; /* keep above hidden link so we can right-click open it */
 }
 
-.caseLink:hover {
-  text-decoration: underline;
+.row:hover { background-color: var(--surface-hover); }
+.row:hover td:first-child { border-left: 3px solid var(--interactive); }
+
+.table td {
+  padding: 13px 20px;
+  vertical-align: middle;
+  border-left: 3px solid transparent;
 }
 
-.causeCell {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.rightAlign {
-  text-align: right;
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* ── Cell Styles ─────────────────────────────────────── */
+.caseId {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-size: 0.8125rem;
   font-weight: 600;
+  color: var(--ink);
 }
 
-.confCell {
-  color: var(--ink-secondary);
-  font-weight: 500;
+.paymentId {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
 }
 
-.negative {
-  color: var(--negative);
-}
-
-.attention {
-  color: var(--attention);
-}
-
-.whyCell {
-  color: var(--ink-secondary);
-  max-width: 300px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.statusCell {
-  white-space: nowrap;
-}
-
-.statusBadge {
-  padding: 4px 8px;
-  border-radius: var(--radius);
+.causeTag {
+  display: inline-block;
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--ink-secondary);
+  background-color: var(--surface-sunk);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 4px;
 }
 
-.statusVerified {
+.exposureCell { white-space: nowrap; }
+.exposureLarge {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--negative);
+  font-variant-numeric: tabular-nums;
+}
+.exposureNormal {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--attention);
+  font-variant-numeric: tabular-nums;
+}
+.exposureZero { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+.evidenceCell { white-space: nowrap; }
+.evidenceNone { color: var(--ink-muted); }
+.evidenceLow  { color: var(--negative); font-weight: 600; }
+.evidenceOk   { color: var(--verified); font-weight: 600; }
+
+.whyCell {
+  color: var(--ink-secondary);
+  max-width: 260px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* ── Status Badges ───────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badgeDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.badgeVerified {
   background-color: var(--verified-bg);
   color: var(--verified);
 }
+.badgeVerified .badgeDot { background-color: var(--verified); }
 
-.statusAttention {
+.badgeAttention {
   background-color: var(--attention-bg);
   color: var(--attention);
 }
+.badgeAttention .badgeDot { background-color: var(--attention); }
 
-.statusNegative {
+.badgeNegative {
   background-color: var(--negative-bg);
   color: var(--negative);
 }
+.badgeNegative .badgeDot { background-color: var(--negative); }
 
-.statusNeutral {
+.badgeNeutral {
   background-color: var(--neutral-bg);
   color: var(--neutral);
 }
+.badgeNeutral .badgeDot { background-color: var(--neutral); }
 
-.loading, .empty {
-  padding: 64px;
+/* ── Empty State ─────────────────────────────────────── */
+.emptyState {
+  padding: 64px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.emptyIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: var(--verified-bg);
+  color: var(--verified);
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.emptyTitle { font-weight: 600; color: var(--ink); font-size: 0.9375rem; }
+.emptySub   { font-size: 0.8125rem; color: var(--ink-muted); }
+
+/* ── Loading skeleton ────────────────────────────────── */
+.tableLoading {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.skeleton {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--surface-sunk) 25%, var(--border) 50%, var(--surface-sunk) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Pagination note ─────────────────────────────────── */
+.paginationNote {
+  padding: 12px 20px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--border);
+  text-align: right;
+  background-color: var(--surface-sunk);
+}
+
+.suspenseFallback {
+  padding: 40px;
   text-align: center;
   color: var(--ink-muted);
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .whyCell { display: none; }
+  .paymentId { display: none; }
+  .table th:nth-child(5) { display: none; }
 }
