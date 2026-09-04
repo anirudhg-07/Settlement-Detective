@@ -23,7 +23,7 @@ Working checklist for the build. Six of sixteen phases done.
 | 10 | Audit trail | ✅ done | 239 |
 | 11 | Razorpay Test Mode integration | ✅ done | 257 |
 | 12 | Backend APIs | ✅ done | **278** |
-| 13 | Frontend dashboard | ✅ done | |
+| 13 | Frontend dashboard | ✅ done |
 | 14 | Evaluation | pending | |
 | 15 | Stress testing | pending | |
 | 16 | Demo / polish / documentation | pending | |

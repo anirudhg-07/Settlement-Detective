@@ -1,4 +1,3 @@
-"use client";
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
@@ -24,12 +23,12 @@ interface ExceptionPage { items: ExceptionSummary[]; total: number; }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    RESOLVED:     { label: "Resolved",     cls: styles.badgeVerified },
-    ESCALATED:    { label: "Escalated",    cls: styles.badgeAttention },
-    REJECTED:     { label: "Rejected",     cls: styles.badgeNegative },
-    DETECTED:     { label: "Detected",     cls: styles.badgeNeutral },
-    INVESTIGATING:{ label: "Investigating", cls: styles.badgeNeutral },
-    REVIEW:       { label: "Review",       cls: styles.badgeAttention },
+    RESOLVED: { label: "Resolved", cls: styles.badgeVerified },
+    ESCALATED: { label: "Escalated", cls: styles.badgeAttention },
+    REJECTED: { label: "Rejected", cls: styles.badgeNegative },
+    DETECTED: { label: "Detected", cls: styles.badgeNeutral },
+    INVESTIGATING: { label: "Investigating", cls: styles.badgeNeutral },
+    REVIEW: { label: "Review", cls: styles.badgeAttention },
   };
   const cfg = map[status] || { label: status, cls: styles.badgeNeutral };
   return <span className={`${styles.badge} ${cfg.cls}`}><span className={styles.badgeDot} />{cfg.label}</span>;
@@ -107,7 +106,7 @@ function QueueContent() {
       <div className={styles.tableWrapper}>
         {loading ? (
           <div className={styles.tableLoading}>
-            {[1,2,3,4,5].map(i => (
+            {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className={styles.skeletonRow}>
                 <div className={styles.skeleton} style={{ width: 100 }} />
                 <div className={styles.skeleton} style={{ width: 140 }} />
